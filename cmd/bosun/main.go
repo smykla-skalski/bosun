@@ -30,7 +30,7 @@ var errGatewayTerminated = errors.New("Discord gateway closed permanently")
 func main() {
 	cfg, err := config.Load()
 	if err != nil {
-		slog.Error("configuration is invalid", "error", err)
+		slog.Error("configuration is invalid", "error_type", safeErrorType(err))
 		os.Exit(1)
 	}
 
@@ -39,7 +39,7 @@ func main() {
 	defer stop()
 
 	if err = run(ctx, cfg, logger); err != nil {
-		logger.Error("bosun stopped", "error", err)
+		logger.Error("bosun stopped", "error_type", safeErrorType(err))
 		os.Exit(1)
 	}
 }
@@ -60,8 +60,8 @@ func run(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 		return fmt.Errorf("build bot service: %w", err)
 	}
 
-	gatewayTerminated := make(chan struct{}, 1)
-	client, err := newDiscordClient(cfg.DiscordToken, service, dependencyLogger(logger), gatewayTerminated)
+	gatewayTerminated := make(chan gatewayTermination, 1)
+	client, err := newDiscordClient(cfg.DiscordToken, service, dependencyLogger(logger), logger, cfg.GuildID, gatewayTerminated)
 	if err != nil {
 		closeService(service, logger)
 		return fmt.Errorf("build Discord client: %w", err)
@@ -97,9 +97,7 @@ func run(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 		}
 		return fmt.Errorf("open Discord gateway: %w", err)
 	}
-	logger.Info("bosun is ready", "guild_id", cfg.GuildID)
-
-	return waitForExit(ctx, healthErrors, gatewayTerminated)
+	return waitForExit(ctx, healthErrors, gatewayTerminated, logger, cfg.GuildID)
 }
 
 func registerGuildCommands(ctx context.Context, applications rest.Applications, applicationID snowflake.ID, guildID snowflake.ID) error {
@@ -107,13 +105,15 @@ func registerGuildCommands(ctx context.Context, applications rest.Applications, 
 	return err
 }
 
-func newDiscordClient(token string, service *botruntime.Service, logger *slog.Logger, terminated chan<- struct{}) (*bot.Client, error) {
+func newDiscordClient(token string, service *botruntime.Service, dependencyLog *slog.Logger, stateLog *slog.Logger, guildID snowflake.ID, terminated chan<- gatewayTermination) (*bot.Client, error) {
 	listeners := []bot.EventListener{
 		bot.NewListenerFunc(service.OnMessageCreate),
 		bot.NewListenerFunc(service.OnApplicationCommand),
+		bot.NewListenerFunc(gatewayReadyHandler(stateLog, guildID)),
+		bot.NewListenerFunc(gatewayResumedHandler(stateLog, guildID)),
 	}
 	return disgo.New(token,
-		bot.WithLogger(logger),
+		bot.WithLogger(dependencyLog),
 		bot.WithEventManagerConfigOpts(eventManagerConfigOpts(listeners...)...),
 		bot.WithGatewayConfigOpts(
 			gateway.WithAutoReconnect(true),
@@ -133,16 +133,25 @@ func eventManagerConfigOpts(listeners ...bot.EventListener) []bot.EventManagerCo
 	}
 }
 
-func gatewayCloseHandler(terminated chan<- struct{}) gateway.CloseHandlerFunc {
-	return func(gateway.Gateway, error, bool) {
+type gatewayTermination struct {
+	errorType string
+	shardID   int
+}
+
+func gatewayCloseHandler(terminated chan<- gatewayTermination) gateway.CloseHandlerFunc {
+	return func(discordGateway gateway.Gateway, err error, _ bool) {
+		shardID := 0
+		if discordGateway != nil {
+			shardID = discordGateway.ShardID()
+		}
 		select {
-		case terminated <- struct{}{}:
+		case terminated <- gatewayTermination{errorType: safeErrorType(err), shardID: shardID}:
 		default:
 		}
 	}
 }
 
-func waitForExit(ctx context.Context, healthErrors <-chan error, gatewayTerminated <-chan struct{}) error {
+func waitForExit(ctx context.Context, healthErrors <-chan error, gatewayTerminated <-chan gatewayTermination, logger *slog.Logger, guildID snowflake.ID) error {
 	select {
 	case <-ctx.Done():
 		return nil
@@ -151,7 +160,8 @@ func waitForExit(ctx context.Context, healthErrors <-chan error, gatewayTerminat
 			return nil
 		}
 		return fmt.Errorf("serve health endpoints: %w", err)
-	case <-gatewayTerminated:
+	case terminal := <-gatewayTerminated:
+		logGatewayDisconnected(logger, guildID, terminal)
 		return errGatewayTerminated
 	}
 }
@@ -161,11 +171,11 @@ func closeResources(client *bot.Client, service *botruntime.Service, healthServe
 	defer cancel()
 
 	if err := service.Close(ctx); err != nil {
-		logger.Error("bot service shutdown failed", "error_type", fmt.Sprintf("%T", err))
+		logger.Error("bot service shutdown failed", "error_type", safeErrorType(err))
 	}
 	client.Close(ctx)
 	if err := healthServer.Shutdown(ctx); err != nil {
-		logger.Error("health server shutdown failed", "error_type", fmt.Sprintf("%T", err))
+		logger.Error("health server shutdown failed", "error_type", safeErrorType(err))
 	}
 }
 
@@ -174,7 +184,7 @@ func closeClientAndService(client *bot.Client, service *botruntime.Service, logg
 	defer cancel()
 
 	if err := service.Close(ctx); err != nil {
-		logger.Error("bot service shutdown failed", "error_type", fmt.Sprintf("%T", err))
+		logger.Error("bot service shutdown failed", "error_type", safeErrorType(err))
 	}
 	client.Close(ctx)
 }
@@ -183,6 +193,6 @@ func closeService(service *botruntime.Service, logger *slog.Logger) {
 	ctx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
 	defer cancel()
 	if err := service.Close(ctx); err != nil {
-		logger.Error("bot service shutdown failed", "error_type", fmt.Sprintf("%T", err))
+		logger.Error("bot service shutdown failed", "error_type", safeErrorType(err))
 	}
 }

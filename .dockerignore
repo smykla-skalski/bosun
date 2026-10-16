@@ -1,0 +1,11 @@
+*
+!Dockerfile
+!go.mod
+!go.sum
+!assets/
+!assets/catalog.go
+!assets/replies.pl.json
+!cmd/
+!cmd/**
+!internal/
+!internal/**
