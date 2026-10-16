@@ -11,11 +11,16 @@ var errExecutorShutdown = errors.New("executor shutdown timed out")
 type executor struct {
 	ctx    context.Context
 	cancel context.CancelFunc
-	jobs   chan func(context.Context)
+	jobs   chan executorJob
 	done   chan struct{}
 
 	mu     sync.RWMutex
 	closed bool
+}
+
+type executorJob struct {
+	run  func(context.Context)
+	drop func()
 }
 
 func newExecutor(workers int, capacity int) (*executor, error) {
@@ -30,23 +35,33 @@ func newExecutor(workers int, capacity int) (*executor, error) {
 	executor := &executor{
 		ctx:    ctx,
 		cancel: cancel,
-		jobs:   make(chan func(context.Context), capacity),
+		jobs:   make(chan executorJob, capacity),
 		done:   make(chan struct{}),
 	}
 	var workersDone sync.WaitGroup
+	var dropsDone sync.WaitGroup
 	workersDone.Add(workers)
 	for range workers {
-		go executor.work(&workersDone)
+		go executor.work(&workersDone, &dropsDone)
 	}
 	go func() {
 		workersDone.Wait()
+		dropsDone.Wait()
 		close(executor.done)
 	}()
 	return executor, nil
 }
 
 func (e *executor) Submit(job func(context.Context)) bool {
-	if job == nil {
+	return e.submit(executorJob{run: job})
+}
+
+func (e *executor) SubmitWithDrop(job func(context.Context), drop func()) bool {
+	return e.submit(executorJob{run: job, drop: drop})
+}
+
+func (e *executor) submit(job executorJob) bool {
+	if job.run == nil {
 		return false
 	}
 	e.mu.RLock()
@@ -83,17 +98,19 @@ func (e *executor) Close(ctx context.Context) error {
 	}
 }
 
-func (e *executor) work(done *sync.WaitGroup) {
-	defer done.Done()
-	for {
-		select {
-		case <-e.ctx.Done():
-			return
-		case job, ok := <-e.jobs:
-			if !ok || e.ctx.Err() != nil {
-				return
+func (e *executor) work(workersDone *sync.WaitGroup, dropsDone *sync.WaitGroup) {
+	defer workersDone.Done()
+	for job := range e.jobs {
+		if e.ctx.Err() != nil {
+			if job.drop != nil {
+				dropsDone.Add(1)
+				go func() {
+					defer dropsDone.Done()
+					job.drop()
+				}()
 			}
-			job(e.ctx)
+			continue
 		}
+		job.run(e.ctx)
 	}
 }

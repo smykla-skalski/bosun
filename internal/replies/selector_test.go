@@ -14,16 +14,16 @@ func TestSelectorEscalatesByTriggerCount(t *testing.T) {
 		return time.Date(2026, time.October, 16, 12, 0, 0, 0, time.UTC)
 	}))
 	wants := []Tier{
-		TierSharp,
-		TierSharp,
 		TierHarsh,
 		TierHarsh,
-		TierHarsh,
+		TierSavage,
+		TierSavage,
+		TierSavage,
 		TierSavage,
 		TierSavage,
 	}
 	for index, want := range wants {
-		selection, err := selector.Select("user-1")
+		selection, err := selector.Select("user-1", CategoryGeneric)
 		if err != nil {
 			t.Fatalf("Select() call %d error = %v", index+1, err)
 		}
@@ -43,18 +43,18 @@ func TestSelectorResetsAfterQuietWindow(t *testing.T) {
 	now := time.Date(2026, time.October, 16, 12, 0, 0, 0, time.UTC)
 	selector := testSelector(t, WithClock(func() time.Time { return now }))
 	for range activityLimit {
-		if _, err := selector.Select("user-1"); err != nil {
+		if _, err := selector.Select("user-1", CategoryGeneric); err != nil {
 			t.Fatalf("Select() error = %v", err)
 		}
 	}
 
 	now = now.Add(defaultWindow)
-	selection, err := selector.Select("user-1")
+	selection, err := selector.Select("user-1", CategoryGeneric)
 	if err != nil {
 		t.Fatalf("Select() after quiet window error = %v", err)
 	}
-	if selection.Tier != TierSharp || selection.TriggerCount != 1 {
-		t.Fatalf("Select() after quiet window = tier %d, count %d; want tier %d, count 1", selection.Tier, selection.TriggerCount, TierSharp)
+	if selection.Tier != TierHarsh || selection.TriggerCount != 1 {
+		t.Fatalf("Select() after quiet window = tier %d, count %d; want tier %d, count 1", selection.Tier, selection.TriggerCount, TierHarsh)
 	}
 }
 
@@ -63,21 +63,64 @@ func TestSelectorKeepsRecentRepliesAfterQuietWindow(t *testing.T) {
 
 	now := time.Date(2026, time.October, 16, 12, 0, 0, 0, time.UTC)
 	selector := testSelector(t, WithClock(func() time.Time { return now }))
-	first, err := selector.Select("user-1")
+	first, err := selector.Select("user-1", CategoryGeneric)
 	if err != nil {
 		t.Fatalf("Select() first error = %v", err)
 	}
 
 	now = now.Add(defaultWindow)
-	second, err := selector.Select("user-1")
+	second, err := selector.Select("user-1", CategoryGeneric)
 	if err != nil {
 		t.Fatalf("Select() after quiet window error = %v", err)
 	}
-	if second.Tier != TierSharp || second.TriggerCount != 1 {
-		t.Fatalf("Select() after quiet window = tier %d, count %d; want tier %d, count 1", second.Tier, second.TriggerCount, TierSharp)
+	if second.Tier != TierHarsh || second.TriggerCount != 1 {
+		t.Fatalf("Select() after quiet window = tier %d, count %d; want tier %d, count 1", second.Tier, second.TriggerCount, TierHarsh)
 	}
 	if second.Reply.ID == first.Reply.ID {
 		t.Fatalf("Select() repeated recent reply %q after quiet window", first.Reply.ID)
+	}
+}
+
+func TestSelectorUsesRequestedCategory(t *testing.T) {
+	t.Parallel()
+
+	selector := testSelector(t)
+	selection, err := selector.Select("user-1", CategoryComplaint)
+	if err != nil {
+		t.Fatalf("Select() error = %v", err)
+	}
+	if selection.Reply.Category != CategoryComplaint {
+		t.Fatalf("Select() category = %q, want %q", selection.Reply.Category, CategoryComplaint)
+	}
+	if selection.Tier != TierHarsh {
+		t.Fatalf("Select() tier = %d, want %d", selection.Tier, TierHarsh)
+	}
+}
+
+func TestSelectorUsesGenericForInvalidCategory(t *testing.T) {
+	t.Parallel()
+
+	selector := testSelector(t)
+	selection, err := selector.Select("user-1", Category("unknown"))
+	if err != nil {
+		t.Fatalf("Select() error = %v", err)
+	}
+	if selection.Reply.Category != CategoryGeneric {
+		t.Fatalf("Select() category = %q, want %q", selection.Reply.Category, CategoryGeneric)
+	}
+}
+
+func TestSelectorUsesGenericForNegatedJoke(t *testing.T) {
+	t.Parallel()
+
+	selector := testSelector(t)
+	category := Classify("Bosun, nie żartuję.")
+	selection, err := selector.Select("user-1", category)
+	if err != nil {
+		t.Fatalf("Select() error = %v", err)
+	}
+	if selection.Reply.Category != CategoryGeneric {
+		t.Fatalf("Select() category = %q, want %q", selection.Reply.Category, CategoryGeneric)
 	}
 }
 
@@ -87,18 +130,18 @@ func TestSelectorKeepsActiveUserState(t *testing.T) {
 	now := time.Date(2026, time.October, 16, 12, 0, 0, 0, time.UTC)
 	selector := testSelector(t, WithClock(func() time.Time { return now }))
 	for range 2 {
-		if _, err := selector.Select("active-user"); err != nil {
+		if _, err := selector.Select("active-user", CategoryGeneric); err != nil {
 			t.Fatalf("Select() active user error = %v", err)
 		}
 	}
 
 	now = now.Add(9 * time.Minute)
-	selection, err := selector.Select("active-user")
+	selection, err := selector.Select("active-user", CategoryGeneric)
 	if err != nil {
 		t.Fatalf("Select() active user error = %v", err)
 	}
-	if selection.Tier != TierHarsh || selection.TriggerCount != 3 {
-		t.Fatalf("active selection = tier %d, count %d; want tier %d, count 3", selection.Tier, selection.TriggerCount, TierHarsh)
+	if selection.Tier != TierSavage || selection.TriggerCount != 3 {
+		t.Fatalf("active selection = tier %d, count %d; want tier %d, count 3", selection.Tier, selection.TriggerCount, TierSavage)
 	}
 }
 
@@ -109,15 +152,15 @@ func TestSelectorCapsUsersWithEqualClockAccessOrder(t *testing.T) {
 	selector := testSelector(t, WithClock(func() time.Time { return now }))
 	for index := range maximumUsers {
 		userID := fmt.Sprintf("user-%04d", index)
-		if _, err := selector.Select(userID); err != nil {
+		if _, err := selector.Select(userID, CategoryGeneric); err != nil {
 			t.Fatalf("Select(%q) error = %v", userID, err)
 		}
 	}
 
-	if _, err := selector.Select("user-0000"); err != nil {
+	if _, err := selector.Select("user-0000", CategoryGeneric); err != nil {
 		t.Fatalf("Select() refreshed user error = %v", err)
 	}
-	if _, err := selector.Select("overflow-user"); err != nil {
+	if _, err := selector.Select("overflow-user", CategoryGeneric); err != nil {
 		t.Fatalf("Select() overflow user error = %v", err)
 	}
 
@@ -141,7 +184,7 @@ func TestSelectorExcludesTwentyMostRecentReplies(t *testing.T) {
 	selector := testSelector(t)
 	recent := make([]string, 0, recentCapacity)
 	for call := 0; call < 80; call++ {
-		selection, err := selector.Select("user-1")
+		selection, err := selector.Select("user-1", CategoryGeneric)
 		if err != nil {
 			t.Fatalf("Select() call %d error = %v", call+1, err)
 		}
@@ -172,7 +215,7 @@ func TestSelectorSupportsConcurrentUse(t *testing.T) {
 			defer wait.Done()
 			userID := fmt.Sprintf("user-%d", worker%4)
 			for range calls {
-				selection, err := selector.Select(userID)
+				selection, err := selector.Select(userID, CategoryGeneric)
 				if err != nil {
 					errors <- err
 					continue
@@ -198,13 +241,13 @@ func TestSelectorWarmPathDoesNotAllocate(t *testing.T) {
 	}
 	selector := NewSelector(catalog, WithIndex(func(int) int { return 0 }))
 	for range activityLimit {
-		if _, err := selector.Select("user-1"); err != nil {
+		if _, err := selector.Select("user-1", CategoryGeneric); err != nil {
 			t.Fatalf("Select() warmup error = %v", err)
 		}
 	}
 
 	allocations := testing.AllocsPerRun(1000, func() {
-		if _, err := selector.Select("user-1"); err != nil {
+		if _, err := selector.Select("user-1", CategoryGeneric); err != nil {
 			panic(err)
 		}
 	})
@@ -220,7 +263,7 @@ func BenchmarkSelectorSelect(b *testing.B) {
 	}
 	selector := NewSelector(catalog)
 	for range activityLimit {
-		if _, err := selector.Select("benchmark-user"); err != nil {
+		if _, err := selector.Select("benchmark-user", CategoryGeneric); err != nil {
 			b.Fatalf("Select() warmup error = %v", err)
 		}
 	}
@@ -228,7 +271,7 @@ func BenchmarkSelectorSelect(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 	for range b.N {
-		if _, err := selector.Select("benchmark-user"); err != nil {
+		if _, err := selector.Select("benchmark-user", CategoryGeneric); err != nil {
 			b.Fatal(err)
 		}
 	}

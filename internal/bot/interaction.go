@@ -8,7 +8,7 @@ import (
 	"github.com/disgoorg/snowflake/v2"
 )
 
-const interactionOverloadMessage = "Bosun ma teraz pełne ręce roboty. Spróbuj ponownie za chwilę."
+const interactionFailureMessage = "Bosun ma teraz pełne ręce roboty. Spróbuj ponownie za chwilę."
 
 type interactionEditor interface {
 	Update(ctx context.Context, applicationID snowflake.ID, token string, update discord.MessageUpdate) error

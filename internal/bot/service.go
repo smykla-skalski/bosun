@@ -3,9 +3,9 @@ package bot
 import (
 	"context"
 	"errors"
-	"fmt"
 	"log/slog"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/disgoorg/disgo/discord"
@@ -13,20 +13,36 @@ import (
 	"github.com/disgoorg/disgo/rest"
 	"github.com/disgoorg/snowflake/v2"
 
+	"github.com/smykla-skalski/bosun/internal/messageprofile"
+	"github.com/smykla-skalski/bosun/internal/openrouter"
 	"github.com/smykla-skalski/bosun/internal/replies"
 )
 
 const (
-	messageWorkerCount     = 4
-	messageQueueCapacity   = 64
-	interactionWorkerCount = 4
-	interactionQueueSize   = 32
-	interactionAckTimeout  = 2500 * time.Millisecond
-	interactionBusyTimeout = 2 * time.Second
+	messageWorkerCount      = 4
+	messageQueueCapacity    = 64
+	interactionWorkerCount  = 4
+	interactionQueueSize    = 32
+	interactionAckTimeout   = 2500 * time.Millisecond
+	interactionFinalTimeout = 5 * time.Second
 )
 
 type ReplySelector interface {
-	Select(userID string) (replies.Selection, error)
+	SelectBatch(userID string, category replies.Category) (replies.Batch, error)
+	CommitBatch(batch replies.Batch, choice int) (replies.Selection, error)
+	CancelBatch(batch replies.Batch) error
+}
+
+type ReplyModel interface {
+	Complete(context.Context, openrouter.Input) (int, error)
+}
+
+type ServiceOption func(*Service)
+
+func WithReplyModel(model ReplyModel) ServiceOption {
+	return func(service *Service) {
+		service.model = model
+	}
 }
 
 type Service struct {
@@ -34,16 +50,69 @@ type Service struct {
 	botID        snowflake.ID
 	matcher      *Matcher
 	selector     ReplySelector
+	model        ReplyModel
+	botHandle    string
 	messages     *executor
 	interactions *executor
 	logger       *slog.Logger
+	finalTimeout time.Duration
+	finalUpdates finalUpdateLifecycle
 }
 
-func NewService(guildID snowflake.ID, botID snowflake.ID, handle string, selector ReplySelector, logger *slog.Logger) (*Service, error) {
-	return newService(guildID, botID, handle, selector, logger, nil, nil)
+type finalUpdateLifecycle struct {
+	mu     sync.Mutex
+	active int
+	closed bool
+	done   chan struct{}
 }
 
-func newService(guildID snowflake.ID, botID snowflake.ID, handle string, selector ReplySelector, logger *slog.Logger, messages *executor, interactions *executor) (*Service, error) {
+func newFinalUpdateLifecycle() finalUpdateLifecycle {
+	return finalUpdateLifecycle{done: make(chan struct{})}
+}
+
+func (l *finalUpdateLifecycle) acquire() bool {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	if l.closed {
+		return false
+	}
+	l.active++
+	return true
+}
+
+func (l *finalUpdateLifecycle) release() {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	l.active--
+	if l.closed && l.active == 0 {
+		close(l.done)
+	}
+}
+
+func (l *finalUpdateLifecycle) close(ctx context.Context) error {
+	l.mu.Lock()
+	if !l.closed {
+		l.closed = true
+		if l.active == 0 {
+			close(l.done)
+		}
+	}
+	done := l.done
+	l.mu.Unlock()
+
+	select {
+	case <-done:
+		return nil
+	case <-ctx.Done():
+		return errExecutorShutdown
+	}
+}
+
+func NewService(guildID snowflake.ID, botID snowflake.ID, handle string, selector ReplySelector, logger *slog.Logger, options ...ServiceOption) (*Service, error) {
+	return newService(guildID, botID, handle, selector, logger, nil, nil, options...)
+}
+
+func newService(guildID snowflake.ID, botID snowflake.ID, handle string, selector ReplySelector, logger *slog.Logger, messages *executor, interactions *executor, options ...ServiceOption) (*Service, error) {
 	if selector == nil {
 		return nil, errors.New("reply selector is nil")
 	}
@@ -72,9 +141,15 @@ func newService(guildID snowflake.ID, botID snowflake.ID, handle string, selecto
 		botID:        botID,
 		matcher:      matcher,
 		selector:     selector,
+		botHandle:    strings.TrimSpace(handle),
 		messages:     messages,
 		interactions: interactions,
 		logger:       logger,
+		finalTimeout: interactionFinalTimeout,
+		finalUpdates: newFinalUpdateLifecycle(),
+	}
+	for _, option := range options {
+		option(service)
 	}
 	return service, nil
 }
@@ -84,7 +159,25 @@ func (s *Service) OnMessageCreate(event *events.MessageCreate) {
 }
 
 func (s *Service) Close(ctx context.Context) error {
-	return errors.Join(s.messages.Close(ctx), s.interactions.Close(ctx))
+	var shutdown sync.WaitGroup
+	var messageErr error
+	var interactionErr error
+	var finalUpdateErr error
+	shutdown.Add(3)
+	go func() {
+		defer shutdown.Done()
+		messageErr = s.messages.Close(ctx)
+	}()
+	go func() {
+		defer shutdown.Done()
+		interactionErr = s.interactions.Close(ctx)
+	}()
+	go func() {
+		defer shutdown.Done()
+		finalUpdateErr = s.finalUpdates.close(ctx)
+	}()
+	shutdown.Wait()
+	return errors.Join(messageErr, interactionErr, finalUpdateErr)
 }
 
 func (s *Service) handleMessage(guildID *snowflake.ID, channelID snowflake.ID, message discord.Message, sender MessageSender) {
@@ -92,37 +185,30 @@ func (s *Service) handleMessage(guildID *snowflake.ID, channelID snowflake.ID, m
 	if !ok {
 		return
 	}
-	resolvedGuildID := *guildID
 	accepted := s.messages.Submit(func(ctx context.Context) {
-		selection, err := s.selector.Select(message.Author.ID.String())
+		category := replies.Classify(messageprofile.Clean(message.Content, s.botHandle))
+		batch, err := s.selector.SelectBatch(message.Author.ID.String(), category)
 		if err != nil {
-			s.logSelectionError(&resolvedGuildID, channelID, message.Author.ID, trigger, err)
+			s.logFault(replies.Selection{}, staticResult("", "selection"))
 			return
 		}
-		response := ReplyMessage(message, selection.Reply.Text)
+		result := s.resolveReply(ctx, message.Content, trigger, category, batch.Selections)
+		selection, err := s.commitSelection(batch, result.selectionIndex)
+		if err != nil {
+			s.logFault(replies.Selection{}, result.withFault("selection_commit"))
+			return
+		}
+		result.text = selection.Reply.Text
+		response := ReplyMessage(message, result.text)
 		err = sendReply(ctx, sender, channelID, response)
 		if err != nil {
-			s.logger.Error("discord message response failed",
-				"guild_id", resolvedGuildID,
-				"channel_id", channelID,
-				"user_id", message.Author.ID,
-				"trigger_type", trigger,
-				"tier", selection.Tier,
-				"reply_id", selection.Reply.ID,
-				"error_type", fmt.Sprintf("%T", err),
-			)
+			s.logFault(selection, result.withFault("discord_send"))
 			return
 		}
-		s.logReply(resolvedGuildID, channelID, message.Author.ID, trigger, selection)
+		s.logResult(selection, result)
 	})
 	if !accepted {
-		s.logger.Warn("discord message response dropped",
-			"guild_id", resolvedGuildID,
-			"channel_id", channelID,
-			"user_id", message.Author.ID,
-			"trigger_type", trigger,
-			"reason", "message_queue_full",
-		)
+		s.logFault(replies.Selection{}, staticResult("", "local_overload"))
 	}
 }
 
@@ -140,104 +226,107 @@ func (s *Service) handleApplicationCommand(event *events.ApplicationCommandInter
 	if !s.acceptsAsk(event.GuildID(), user, data.CommandName(), question, hasQuestion) {
 		return
 	}
-
-	selection, err := s.selector.Select(user.ID.String())
-	channelID := interactionChannelID(event.Channel())
-	if err != nil {
-		s.logSelectionError(event.GuildID(), channelID, user.ID, TriggerAsk, err)
+	if !s.finalUpdates.acquire() {
 		return
 	}
 
-	guildID := *event.GuildID()
+	category := replies.Classify(messageprofile.Clean(question, s.botHandle))
 	ackCtx, cancel := context.WithTimeout(s.interactions.Context(), interactionAckTimeout)
-	err = event.DeferCreateMessage(false, rest.WithCtx(ackCtx))
+	err := event.DeferCreateMessage(false, rest.WithCtx(ackCtx))
 	cancel()
 	if err != nil {
-		s.logger.Error("discord interaction acknowledgement failed",
-			"guild_id", guildID,
-			"channel_id", channelID,
-			"user_id", user.ID,
-			"trigger_type", TriggerAsk,
-			"tier", selection.Tier,
-			"reply_id", selection.Reply.ID,
-			"error_type", fmt.Sprintf("%T", err),
-		)
+		s.finalUpdates.release()
+		s.logFault(replies.Selection{}, staticResult("", "discord_ack"))
 		return
 	}
 
-	response := InteractionUpdate(selection.Reply.Text)
 	applicationID := event.ApplicationID()
 	token := event.Token()
-	accepted := s.interactions.Submit(func(ctx context.Context) {
-		if err := editor.Update(ctx, applicationID, token, response); err != nil {
-			s.logger.Error("discord interaction response failed",
-				"guild_id", guildID,
-				"channel_id", channelID,
-				"user_id", user.ID,
-				"trigger_type", TriggerAsk,
-				"tier", selection.Tier,
-				"reply_id", selection.Reply.ID,
-				"error_type", fmt.Sprintf("%T", err),
-			)
+	accepted := s.interactions.SubmitWithDrop(func(ctx context.Context) {
+		defer s.finalUpdates.release()
+		batch, err := s.selector.SelectBatch(user.ID.String(), category)
+		if err != nil {
+			s.finishInteractionFault(ctx, editor, applicationID, token, "selection")
 			return
 		}
-		s.logReply(guildID, channelID, user.ID, TriggerAsk, selection)
+		result := s.resolveReply(ctx, question, TriggerAsk, category, batch.Selections)
+		selection, err := s.commitSelection(batch, result.selectionIndex)
+		if err != nil {
+			s.finishInteractionFault(ctx, editor, applicationID, token, "selection_commit")
+			return
+		}
+		result.text = selection.Reply.Text
+		response := InteractionUpdate(result.text)
+		if err := s.editFinalInteraction(ctx, editor, applicationID, token, response); err != nil {
+			s.logFault(selection, result.withFault("discord_edit"))
+			return
+		}
+		s.logResult(selection, result)
+	}, func() {
+		defer s.finalUpdates.release()
+		s.finishInteractionFault(context.Background(), editor, applicationID, token, "service_shutdown")
 	})
 	if !accepted {
-		s.logger.Warn("discord interaction queue overloaded",
-			"guild_id", guildID,
-			"channel_id", channelID,
-			"user_id", user.ID,
-			"trigger_type", TriggerAsk,
-			"tier", selection.Tier,
-			"reply_id", selection.Reply.ID,
-			"reason", "interaction_queue_full",
+		defer s.finalUpdates.release()
+		batch, selectErr := s.selector.SelectBatch(user.ID.String(), category)
+		if selectErr != nil {
+			s.finishInteractionFault(context.Background(), editor, applicationID, token, "selection")
+			return
+		}
+		fallback := batch.Selections[0]
+		result := staticResult(fallback.Reply.Text, "local_overload")
+		selection, commitErr := s.commitSelection(batch, 0)
+		if commitErr != nil {
+			s.finishInteractionFault(context.Background(), editor, applicationID, token, "selection_commit")
+			return
+		}
+		result.text = selection.Reply.Text
+		s.logFault(selection, result)
+		err := s.editFinalInteraction(
+			s.interactions.Context(), editor, applicationID, token, InteractionUpdate(result.text),
 		)
-		busyCtx, busyCancel := context.WithTimeout(s.interactions.Context(), interactionBusyTimeout)
-		err := editor.Update(busyCtx, applicationID, token, InteractionUpdate(interactionOverloadMessage))
-		busyCancel()
 		if err != nil {
-			s.logger.Error("discord interaction overload response failed",
-				"guild_id", guildID,
-				"channel_id", channelID,
-				"user_id", user.ID,
-				"trigger_type", TriggerAsk,
-				"tier", selection.Tier,
-				"reply_id", selection.Reply.ID,
-				"error_type", fmt.Sprintf("%T", err),
-			)
+			s.logFault(selection, result.withFault("discord_edit"))
 		}
 	}
+}
+
+func (s *Service) finishInteractionFault(
+	ctx context.Context,
+	editor interactionEditor,
+	applicationID snowflake.ID,
+	token string,
+	faultClass string,
+) {
+	result := staticResult(interactionFailureMessage, faultClass)
+	if err := s.editFinalInteraction(ctx, editor, applicationID, token, InteractionUpdate(result.text)); err != nil {
+		s.logFault(replies.Selection{}, result.withFault("discord_edit"))
+		return
+	}
+	s.logFault(replies.Selection{}, result)
+}
+
+func (s *Service) editFinalInteraction(
+	parent context.Context,
+	editor interactionEditor,
+	applicationID snowflake.ID,
+	token string,
+	update discord.MessageUpdate,
+) error {
+	ctx, cancel := context.WithTimeout(context.WithoutCancel(parent), s.finalTimeout)
+	defer cancel()
+	return editor.Update(ctx, applicationID, token, update)
+}
+
+func (s *Service) commitSelection(batch replies.Batch, choice int) (replies.Selection, error) {
+	selection, err := s.selector.CommitBatch(batch, choice)
+	if err != nil {
+		_ = s.selector.CancelBatch(batch)
+		return replies.Selection{}, err
+	}
+	return selection, nil
 }
 
 func (s *Service) acceptsAsk(guildID *snowflake.ID, user discord.User, commandName string, question string, hasQuestion bool) bool {
 	return guildID != nil && *guildID == s.guildID && commandName == "ask" && hasQuestion && strings.TrimSpace(question) != "" && !user.Bot && user.ID != s.botID
-}
-
-func (s *Service) logSelectionError(guildID *snowflake.ID, channelID snowflake.ID, userID snowflake.ID, trigger TriggerType, err error) {
-	s.logger.Error("reply selection failed",
-		"guild_id", guildID,
-		"channel_id", channelID,
-		"user_id", userID,
-		"trigger_type", trigger,
-		"error_type", fmt.Sprintf("%T", err),
-	)
-}
-
-func (s *Service) logReply(guildID snowflake.ID, channelID snowflake.ID, userID snowflake.ID, trigger TriggerType, selection replies.Selection) {
-	s.logger.Info("reply sent",
-		"guild_id", guildID,
-		"channel_id", channelID,
-		"user_id", userID,
-		"trigger_type", trigger,
-		"tier", selection.Tier,
-		"reply_id", selection.Reply.ID,
-	)
-}
-
-func interactionChannelID(channel discord.InteractionChannel) snowflake.ID {
-	if channel.MessageChannel == nil {
-		return 0
-	}
-	return channel.ID()
 }

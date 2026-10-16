@@ -3,11 +3,12 @@ package bot
 import (
 	"bytes"
 	"context"
-	"errors"
+	"encoding/json"
 	"io"
 	"log/slog"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -16,6 +17,7 @@ import (
 	"github.com/disgoorg/disgo/rest"
 	"github.com/disgoorg/snowflake/v2"
 
+	"github.com/smykla-skalski/bosun/internal/openrouter"
 	"github.com/smykla-skalski/bosun/internal/replies"
 )
 
@@ -55,14 +57,128 @@ func TestServiceAcceptsAskOnlyForConfiguredGuildAndHuman(t *testing.T) {
 	}
 }
 
-func TestServiceDoesNotLogErrorContent(t *testing.T) {
+func TestServiceLogsOnlySafeReplyFields(t *testing.T) {
 	t.Parallel()
 
 	var output bytes.Buffer
 	service := &Service{logger: slog.New(slog.NewJSONHandler(&output, nil))}
-	service.logSelectionError(nil, 2, 7, TriggerHandle, errors.New("private message text"))
-	if strings.Contains(output.String(), "private message text") {
-		t.Fatal("selection error log contains private content")
+	selection := fixedSelection()
+	service.logFault(selection, staticResult("private reply text", "timeout"))
+	var record map[string]any
+	if err := json.Unmarshal(output.Bytes(), &record); err != nil {
+		t.Fatalf("json.Unmarshal() error = %v", err)
+	}
+	allowed := map[string]bool{
+		"time": true, "level": true, "msg": true, "source": true, "tier": true,
+		"static_reply_id": true, "fault_class": true,
+	}
+	for key := range record {
+		if !allowed[key] {
+			t.Fatalf("reply log contains unsafe field %q", key)
+		}
+	}
+	for _, privateText := range []string{"private reply text", "private message text", "private/model"} {
+		if strings.Contains(output.String(), privateText) {
+			t.Fatalf("reply log contains private content: %s", output.String())
+		}
+	}
+}
+
+func TestServicePassesLocalMessageCategoryToSelector(t *testing.T) {
+	t.Parallel()
+
+	categories := make(chan replies.Category, 1)
+	selector := selectorFunc{selectBatch: func(_ string, category replies.Category) (replies.Batch, error) {
+		categories <- category
+		return replies.Batch{Selections: fixedSelections()}, nil
+	}}
+	service, err := NewService(42, 99, "Bosun", selector, slog.New(slog.NewTextHandler(io.Discard, nil)))
+	if err != nil {
+		t.Fatalf("NewService() error = %v", err)
+	}
+	t.Cleanup(func() { closeService(t, service) })
+	guildID := snowflake.ID(42)
+	service.handleMessage(&guildID, 2, discord.Message{
+		ID: 1, GuildID: &guildID, ChannelID: 2, Author: discord.User{ID: 7}, Content: "Bosun, zrób to teraz",
+	}, &recordingSender{})
+	select {
+	case category := <-categories:
+		if category != replies.CategoryRequest {
+			t.Fatalf("selector category = %q, want %q", category, replies.CategoryRequest)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("selector did not receive the local message category")
+	}
+}
+
+func TestServiceCategoryIgnoresExcludedCanaryContent(t *testing.T) {
+	t.Parallel()
+
+	categories := make(chan replies.Category, 1)
+	selector := selectorFunc{selectBatch: func(_ string, category replies.Category) (replies.Batch, error) {
+		categories <- category
+		return replies.Batch{Selections: fixedSelections()}, nil
+	}}
+	service, err := NewService(42, 99, "Bosun", selector, slog.New(slog.NewTextHandler(io.Discard, nil)))
+	if err != nil {
+		t.Fatalf("NewService() error = %v", err)
+	}
+	t.Cleanup(func() { closeService(t, service) })
+	guildID := snowflake.ID(42)
+	canary := "Bosun spokojna wiadomość <@123> <#456> <:idiota:789> https://idiota.example/?!!! DiScOrD.Gg/idiota!!! DiScOrD.CoM/InViTe/idiota!!! `idiota?` 123456"
+	service.handleMessage(&guildID, 2, discord.Message{
+		ID: 1, GuildID: &guildID, ChannelID: 2, Author: discord.User{ID: 7}, Content: canary,
+	}, &recordingSender{})
+	select {
+	case category := <-categories:
+		if category != replies.CategoryGeneric {
+			t.Fatalf("selector category = %q, want %q", category, replies.CategoryGeneric)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("selector did not receive the local message category")
+	}
+}
+
+func TestDynamicMessageUsesOneBatchAndOneModelDecision(t *testing.T) {
+	t.Parallel()
+
+	var batchCalls atomic.Int32
+	committed := make(chan int, 1)
+	selector := selectorFunc{selectBatch: func(_ string, _ replies.Category) (replies.Batch, error) {
+		batchCalls.Add(1)
+		return replies.Batch{Selections: fixedSelections()}, nil
+	}, commitBatch: func(batch replies.Batch, choice int) (replies.Selection, error) {
+		committed <- choice
+		return batch.Selections[choice], nil
+	}}
+	var modelCalls atomic.Int32
+	modelCalled := make(chan struct{}, 1)
+	model := replyModelFunc{complete: func(context.Context, openrouter.Input) (int, error) {
+		modelCalls.Add(1)
+		modelCalled <- struct{}{}
+		return 4, nil
+	}}
+	service, err := NewService(
+		42, 99, "Bosun", selector, slog.New(slog.NewTextHandler(io.Discard, nil)), WithReplyModel(model),
+	)
+	if err != nil {
+		t.Fatalf("NewService() error = %v", err)
+	}
+	t.Cleanup(func() { closeService(t, service) })
+	guildID := snowflake.ID(42)
+	service.handleMessage(&guildID, 2, discord.Message{
+		ID: 1, GuildID: &guildID, ChannelID: 2, Author: discord.User{ID: 7}, Content: "Bosun, odpowiedz",
+	}, &recordingSender{})
+	select {
+	case choice := <-committed:
+		if choice != 4 {
+			t.Fatalf("committed choice = %d, want 4", choice)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("the model choice was not committed")
+	}
+	if batchCalls.Load() != 1 || modelCalls.Load() != 1 {
+		t.Fatalf("calls: batch = %d, model = %d", batchCalls.Load(), modelCalls.Load())
 	}
 }
 
@@ -158,13 +274,114 @@ func TestServiceCloseCancelsBothExecutors(t *testing.T) {
 	}
 }
 
+func TestServiceCloseCancelsExecutorsConcurrently(t *testing.T) {
+	messages := mustExecutor(t, 1, 1)
+	interactions := mustExecutor(t, 1, 1)
+	messageStarted := make(chan struct{})
+	releaseMessage := make(chan struct{})
+	var releaseOnce sync.Once
+	t.Cleanup(func() { releaseOnce.Do(func() { close(releaseMessage) }) })
+	if !messages.Submit(func(context.Context) {
+		close(messageStarted)
+		<-releaseMessage
+	}) {
+		t.Fatal("the message executor rejected the blocker")
+	}
+	interactionStarted, interactionCanceled := submitCancellationProbe(t, interactions)
+	<-messageStarted
+	<-interactionStarted
+
+	service, err := newService(
+		42,
+		99,
+		"Bosun",
+		fixedSelector{},
+		slog.New(slog.NewTextHandler(io.Discard, nil)),
+		messages,
+		interactions,
+	)
+	if err != nil {
+		t.Fatalf("newService() error = %v", err)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	closed := make(chan error, 1)
+	go func() { closed <- service.Close(ctx) }()
+	select {
+	case <-interactionCanceled:
+	case <-time.After(time.Second):
+		t.Fatal("message shutdown delayed interaction cancellation")
+	}
+	releaseOnce.Do(func() { close(releaseMessage) })
+	if err := <-closed; err != nil {
+		t.Fatalf("Service.Close() error = %v", err)
+	}
+}
+
 type fixedSelector struct{}
 
-func (fixedSelector) Select(string) (replies.Selection, error) {
+func (fixedSelector) SelectBatch(string, replies.Category) (replies.Batch, error) {
+	return replies.Batch{Selections: fixedSelections()}, nil
+}
+
+func (fixedSelector) CommitBatch(batch replies.Batch, choice int) (replies.Selection, error) {
+	return batch.Selections[choice], nil
+}
+
+func (fixedSelector) CancelBatch(replies.Batch) error {
+	return nil
+}
+
+type selectorFunc struct {
+	selectBatch func(string, replies.Category) (replies.Batch, error)
+	commitBatch func(replies.Batch, int) (replies.Selection, error)
+	cancelBatch func(replies.Batch) error
+}
+
+func (f selectorFunc) SelectBatch(userID string, category replies.Category) (replies.Batch, error) {
+	return f.selectBatch(userID, category)
+}
+
+func (f selectorFunc) CommitBatch(batch replies.Batch, choice int) (replies.Selection, error) {
+	if f.commitBatch != nil {
+		return f.commitBatch(batch, choice)
+	}
+	return batch.Selections[choice], nil
+}
+
+func (f selectorFunc) CancelBatch(batch replies.Batch) error {
+	if f.cancelBatch != nil {
+		return f.cancelBatch(batch)
+	}
+	return nil
+}
+
+func fixedSelection() replies.Selection {
 	return replies.Selection{
 		Reply: replies.Reply{ID: "test-reply", Tier: replies.TierSharp, Text: "private reply text"},
 		Tier:  replies.TierSharp,
-	}, nil
+	}
+}
+
+func fixedSelections() [replies.CandidateCount]replies.Selection {
+	selections := [replies.CandidateCount]replies.Selection{}
+	texts := [8]string{
+		"private reply text",
+		"pierwsza lokalna odpowiedź",
+		"druga lokalna odpowiedź",
+		"trzecia lokalna odpowiedź",
+		"czwarta lokalna odpowiedź",
+		"piąta lokalna odpowiedź",
+		"szósta lokalna odpowiedź",
+		"siódma lokalna odpowiedź",
+	}
+	for index := range selections {
+		selections[index] = replies.Selection{
+			Reply: replies.Reply{ID: "test-reply-" + string(rune('a'+index)), Tier: replies.TierSharp, Text: texts[index]},
+			Tier:  replies.TierSharp,
+		}
+	}
+	return selections
 }
 
 type blockingSender struct {
