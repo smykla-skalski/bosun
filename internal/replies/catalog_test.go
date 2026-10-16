@@ -1,6 +1,10 @@
 package replies
 
-import "testing"
+import (
+	"fmt"
+	"strings"
+	"testing"
+)
 
 func TestEmbeddedCatalogCounts(t *testing.T) {
 	t.Parallel()
@@ -44,5 +48,34 @@ func TestEmbeddedCatalogHasUniqueIDsAndText(t *testing.T) {
 		}
 		ids[entry.ID] = struct{}{}
 		texts[entry.Text] = struct{}{}
+	}
+}
+
+func TestNewCatalogRequiresMoreRepliesThanRecentWindow(t *testing.T) {
+	t.Parallel()
+
+	entries := make([]Reply, 0, minimumTierReplies*3-1)
+	for tier := TierSharp; tier <= TierSavage; tier++ {
+		count := minimumTierReplies
+		if tier == TierHarsh {
+			count--
+		}
+		for index := range count {
+			entries = append(entries, Reply{
+				ID:       fmt.Sprintf("tier-%d-%02d", tier, index),
+				Locale:   "pl",
+				Category: "generic",
+				Tier:     tier,
+				Text:     fmt.Sprintf("Unikalna odpowiedź %d-%02d.", tier, index),
+			})
+		}
+	}
+
+	_, err := NewCatalog(entries)
+	if err == nil {
+		t.Fatal("NewCatalog() error = nil, want tier capacity error")
+	}
+	if want := "tier 2 has 20 replies, need at least 21"; !strings.Contains(err.Error(), want) {
+		t.Fatalf("NewCatalog() error = %q, want text %q", err, want)
 	}
 }

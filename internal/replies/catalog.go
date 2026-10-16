@@ -16,6 +16,8 @@ const (
 	TierSharp  Tier = 1
 	TierHarsh  Tier = 2
 	TierSavage Tier = 3
+
+	minimumTierReplies = recentCapacity + 1
 )
 
 type Reply struct {
@@ -82,8 +84,9 @@ func NewCatalog(entries []Reply) (Catalog, error) {
 	}
 
 	for tier := TierSharp; tier <= TierSavage; tier++ {
-		if len(catalog.byTier[tier]) == 0 {
-			return Catalog{}, fmt.Errorf("tier %d is empty", tier)
+		count := len(catalog.byTier[tier])
+		if count < minimumTierReplies {
+			return Catalog{}, fmt.Errorf("tier %d has %d replies, need at least %d", tier, count, minimumTierReplies)
 		}
 	}
 	return catalog, nil
