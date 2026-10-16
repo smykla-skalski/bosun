@@ -1,0 +1,29 @@
+app = "smykland-bosun"
+primary_region = "fra"
+kill_signal = "SIGTERM"
+kill_timeout = 15
+
+[build]
+  dockerfile = "Dockerfile"
+
+[env]
+  BOT_HANDLE = "Bosun"
+  LOG_LEVEL = "info"
+  PORT = "8080"
+
+[checks]
+  [checks.readiness]
+    grace_period = "20s"
+    interval = "15s"
+    method = "get"
+    path = "/readyz"
+    port = 8080
+    timeout = "5s"
+    type = "http"
+
+[[restart]]
+  policy = "always"
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "256mb"

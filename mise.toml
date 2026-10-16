@@ -53,15 +53,22 @@ run = "go run ./tools/replygen -check"
 
 [tasks."docker:build"]
 description = "Build the container image"
-run = "docker build --tag bosun:local ."
+run = "docker build --pull --platform linux/amd64 --tag smykland-bosun:local ."
 
 [tasks."fly:validate"]
 description = "Validate the Fly configuration"
-run = "fly config validate --config fly.toml"
+run = '''
+fly_app_name="${FLY_APP_NAME:-smykland-bosun}"
+fly config validate --app "$fly_app_name" --config fly.toml --strict
+'''
 
 [tasks."fly:deploy"]
 description = "Deploy Bosun to Fly"
-run = "fly deploy --config fly.toml"
+run = '''
+fly_app_name="${FLY_APP_NAME:-smykland-bosun}"
+fly deploy --app "$fly_app_name" --config fly.toml --ha=false --no-public-ips
+fly scale count 1 --app "$fly_app_name" --config fly.toml --region fra --yes
+'''
 
 [tasks.check]
 description = "Run all local checks"
