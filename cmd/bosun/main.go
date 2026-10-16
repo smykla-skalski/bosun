@@ -20,6 +20,7 @@ import (
 	botruntime "github.com/smykla-skalski/bosun/internal/bot"
 	"github.com/smykla-skalski/bosun/internal/config"
 	"github.com/smykla-skalski/bosun/internal/health"
+	"github.com/smykla-skalski/bosun/internal/openrouter"
 	"github.com/smykla-skalski/bosun/internal/replies"
 )
 
@@ -49,12 +50,26 @@ func run(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 	if err != nil {
 		return fmt.Errorf("load reply catalog: %w", err)
 	}
+	serviceOptions := make([]botruntime.ServiceOption, 0, 1)
+	if cfg.OpenRouterEnabled() {
+		model, modelErr := openrouter.New(openrouter.Config{
+			APIKey:          cfg.OpenRouterAPIKey,
+			Model:           cfg.OpenRouterModel,
+			BalanceCooldown: cfg.OpenRouterBalanceCooldown,
+			RequestTimeout:  cfg.OpenRouterRequestTimeout,
+		})
+		if modelErr != nil {
+			return fmt.Errorf("build OpenRouter client: %w", modelErr)
+		}
+		serviceOptions = append(serviceOptions, botruntime.WithReplyModel(model))
+	}
 	service, err := botruntime.NewService(
 		cfg.GuildID,
 		cfg.ApplicationID,
 		cfg.BotHandle,
 		replies.NewSelector(catalog),
 		logger,
+		serviceOptions...,
 	)
 	if err != nil {
 		return fmt.Errorf("build bot service: %w", err)

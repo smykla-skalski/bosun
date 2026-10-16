@@ -13,6 +13,8 @@ import (
 	"github.com/disgoorg/disgo/discord"
 	"github.com/disgoorg/disgo/rest"
 	"github.com/disgoorg/snowflake/v2"
+
+	"github.com/smykla-skalski/bosun/internal/replies"
 )
 
 func TestAskAcknowledgesThenEditsDeferredResponse(t *testing.T) {
@@ -29,7 +31,11 @@ func TestAskAcknowledgesThenEditsDeferredResponse(t *testing.T) {
 	})
 	edits := make(chan recordedInteractionEdit, 1)
 	editor := interactionEditorFunc(func(ctx context.Context, applicationID snowflake.ID, token string, update discord.MessageUpdate) error {
-		edits <- recordedInteractionEdit{ctx: ctx, applicationID: applicationID, token: token, update: update}
+		deadline, _ := ctx.Deadline()
+		edits <- recordedInteractionEdit{
+			initialErr: ctx.Err(), deadline: deadline,
+			applicationID: applicationID, token: token, update: update,
+		}
 		return nil
 	})
 
@@ -42,12 +48,46 @@ func TestAskAcknowledgesThenEditsDeferredResponse(t *testing.T) {
 		if edit.applicationID != 99 || edit.token != "interaction-token" {
 			t.Fatalf("interaction target = %d, %q", edit.applicationID, edit.token)
 		}
-		if edit.ctx.Err() != nil {
-			t.Fatalf("interaction edit context error = %v", edit.ctx.Err())
+		if edit.initialErr != nil || edit.deadline.IsZero() {
+			t.Fatalf("interaction edit context = error %v, deadline %v", edit.initialErr, edit.deadline)
 		}
 		assertInteractionUpdate(t, edit.update, "private reply text")
 	case <-time.After(time.Second):
 		t.Fatal("the deferred interaction response was not edited")
+	}
+}
+
+func TestAskFinalEditCanTakeMoreThanHalfASecond(t *testing.T) {
+	t.Parallel()
+
+	service := newInteractionTestService(t, 1, 1, nil)
+	event := successfulAskEvent(t)
+	result := make(chan error, 1)
+	service.handleApplicationCommand(event, interactionEditorFunc(func(ctx context.Context, _ snowflake.ID, _ string, _ discord.MessageUpdate) error {
+		deadline, ok := ctx.Deadline()
+		if !ok || time.Until(deadline) < 4*time.Second {
+			result <- errors.New("the final edit does not have the production deadline")
+			return nil
+		}
+		timer := time.NewTimer(600 * time.Millisecond)
+		defer timer.Stop()
+		select {
+		case <-timer.C:
+			result <- nil
+			return nil
+		case <-ctx.Done():
+			result <- ctx.Err()
+			return ctx.Err()
+		}
+	}))
+
+	select {
+	case err := <-result:
+		if err != nil {
+			t.Fatalf("delayed final edit failed: %v", err)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("the delayed final edit did not finish")
 	}
 }
 
@@ -117,14 +157,14 @@ func TestAskOverloadEditsDeferredResponseWithSafeMessage(t *testing.T) {
 	if !acknowledged {
 		t.Fatal("the overloaded interaction was not acknowledged")
 	}
-	assertInteractionUpdate(t, overloadUpdate, interactionOverloadMessage)
+	assertInteractionUpdate(t, overloadUpdate, "private reply text")
 	remaining := time.Until(overloadDeadline)
-	if overloadDeadline.IsZero() || remaining <= 0 || remaining > interactionBusyTimeout {
+	if overloadDeadline.IsZero() || remaining <= 0 || remaining > interactionFinalTimeout {
 		t.Fatalf("overload edit deadline remaining = %v", remaining)
 	}
 	logOutput := output.String()
-	if !strings.Contains(logOutput, "interaction_queue_full") {
-		t.Fatalf("overload log = %q, want queue reason", logOutput)
+	if !strings.Contains(logOutput, `"fault_class":"local_overload"`) {
+		t.Fatalf("overload log = %q, want safe fault class", logOutput)
 	}
 	if strings.Contains(logOutput, "co teraz?") || strings.Contains(logOutput, "private reply text") {
 		t.Fatalf("overload log contains private content: %s", logOutput)
@@ -149,7 +189,7 @@ func TestAskAcknowledgementFailureStopsBeforeEdit(t *testing.T) {
 		t.Fatal("the interaction edit ran after acknowledgement failure")
 	}
 	logOutput := output.String()
-	if !strings.Contains(logOutput, "discord interaction acknowledgement failed") {
+	if !strings.Contains(logOutput, `"fault_class":"discord_ack"`) {
 		t.Fatalf("acknowledgement log = %q, want failure event", logOutput)
 	}
 	for _, privateText := range []string{"private acknowledgement error", "co teraz?", "private reply text"} {
@@ -159,19 +199,133 @@ func TestAskAcknowledgementFailureStopsBeforeEdit(t *testing.T) {
 	}
 }
 
-func TestServiceCloseCancelsInteractionEdit(t *testing.T) {
+func TestAskSelectionCapacityFaultFinalizesDeferredResponse(t *testing.T) {
+	selector := selectorFunc{selectBatch: func(string, replies.Category) (replies.Batch, error) {
+		return replies.Batch{}, replies.ErrReservationCapacity
+	}}
+	service := newInteractionServiceWithSelector(t, selector, mustExecutor(t, 1, 1))
+	edits := make(chan discord.MessageUpdate, 2)
+	service.handleApplicationCommand(successfulAskEvent(t), interactionEditorFunc(func(
+		_ context.Context,
+		_ snowflake.ID,
+		_ string,
+		update discord.MessageUpdate,
+	) error {
+		edits <- update
+		return nil
+	}))
+	assertOneFailureUpdate(t, edits)
+}
+
+func TestAskRejectedQueueSelectionFaultFinalizesDeferredResponse(t *testing.T) {
+	selector := selectorFunc{selectBatch: func(string, replies.Category) (replies.Batch, error) {
+		return replies.Batch{}, replies.ErrReservationCapacity
+	}}
+	executor := mustExecutor(t, 1, 1)
+	blockExecutorWorkers(t, executor, 1)
+	if !executor.Submit(func(ctx context.Context) { <-ctx.Done() }) {
+		t.Fatal("the interaction queue rejected the setup job")
+	}
+	service := newInteractionServiceWithSelector(t, selector, executor)
+	edits := make(chan discord.MessageUpdate, 2)
+	service.handleApplicationCommand(successfulAskEvent(t), interactionEditorFunc(func(
+		_ context.Context,
+		_ snowflake.ID,
+		_ string,
+		update discord.MessageUpdate,
+	) error {
+		edits <- update
+		return nil
+	}))
+	assertOneFailureUpdate(t, edits)
+}
+
+func TestServiceCloseWaitsForRejectedFinalEditsTogether(t *testing.T) {
 	t.Parallel()
 
+	const editCount = 3
 	service := newInteractionTestService(t, 1, 1, nil)
+	blockExecutorWorkers(t, service.interactions, 1)
+	if !service.interactions.Submit(func(ctx context.Context) { <-ctx.Done() }) {
+		t.Fatal("the interaction queue rejected the setup job")
+	}
+
+	started := make(chan struct{}, editCount+1)
+	release := make(chan struct{})
+	handled := make(chan struct{}, editCount)
+	editor := interactionEditorFunc(func(ctx context.Context, _ snowflake.ID, _ string, _ discord.MessageUpdate) error {
+		started <- struct{}{}
+		select {
+		case <-release:
+			return nil
+		case <-ctx.Done():
+			return ctx.Err()
+		}
+	})
+	for range editCount {
+		event := successfulAskEvent(t)
+		go func() {
+			service.handleApplicationCommand(event, editor)
+			handled <- struct{}{}
+		}()
+	}
+	for range editCount {
+		select {
+		case <-started:
+		case <-time.After(time.Second):
+			t.Fatal("the rejected final edits did not start together")
+		}
+	}
+
+	closeCtx, cancelClose := context.WithTimeout(context.Background(), time.Second)
+	defer cancelClose()
+	closed := make(chan error, 1)
+	go func() { closed <- service.Close(closeCtx) }()
+	select {
+	case <-service.interactions.Context().Done():
+	case <-time.After(time.Second):
+		t.Fatal("service shutdown did not start")
+	}
+	select {
+	case err := <-closed:
+		t.Fatalf("Service.Close() returned before final edits finished: %v", err)
+	default:
+	}
+
+	close(release)
+	for range editCount {
+		select {
+		case <-handled:
+		case <-time.After(time.Second):
+			t.Fatal("a rejected interaction did not finish")
+		}
+	}
+	if err := <-closed; err != nil {
+		t.Fatalf("Service.Close() error = %v", err)
+	}
+	select {
+	case <-started:
+		t.Fatal("a rejected interaction received multiple final updates")
+	default:
+	}
+}
+
+func TestServiceCloseWaitsForBoundedInteractionEdit(t *testing.T) {
+	t.Parallel()
+
+	const testFinalTimeout = 40 * time.Millisecond
+	service := newInteractionTestService(t, 1, 1, nil, func(service *Service) {
+		service.finalTimeout = testFinalTimeout
+	})
 	started := make(chan struct{})
-	canceled := make(chan struct{})
+	finished := make(chan error, 1)
 	event := testAskEventWithResponder(t, func(discord.InteractionResponseType, discord.InteractionResponseData, ...rest.RequestOpt) error {
 		return nil
 	})
 	service.handleApplicationCommand(event, interactionEditorFunc(func(ctx context.Context, _ snowflake.ID, _ string, _ discord.MessageUpdate) error {
 		close(started)
 		<-ctx.Done()
-		close(canceled)
+		finished <- ctx.Err()
 		return ctx.Err()
 	}))
 	select {
@@ -180,11 +334,18 @@ func TestServiceCloseCancelsInteractionEdit(t *testing.T) {
 		t.Fatal("the interaction edit did not start")
 	}
 
+	startedClose := time.Now()
 	closeService(t, service)
+	if elapsed := time.Since(startedClose); elapsed > 500*time.Millisecond {
+		t.Fatalf("service shutdown elapsed = %v, want a bounded wait", elapsed)
+	}
 	select {
-	case <-canceled:
+	case err := <-finished:
+		if !errors.Is(err, context.DeadlineExceeded) {
+			t.Fatalf("final edit context error = %v, want deadline", err)
+		}
 	default:
-		t.Fatal("service shutdown did not cancel the interaction edit")
+		t.Fatal("service shutdown returned before the bounded edit finished")
 	}
 }
 
@@ -195,20 +356,34 @@ func (f interactionEditorFunc) Update(ctx context.Context, applicationID snowfla
 }
 
 type recordedInteractionEdit struct {
-	ctx           context.Context
+	initialErr    error
+	deadline      time.Time
 	applicationID snowflake.ID
 	token         string
 	update        discord.MessageUpdate
 }
 
-func newInteractionTestService(t *testing.T, workers int, capacity int, logger *slog.Logger) *Service {
+func newInteractionTestService(t *testing.T, workers int, capacity int, logger *slog.Logger, options ...ServiceOption) *Service {
 	t.Helper()
 	if logger == nil {
 		logger = slog.New(slog.NewTextHandler(io.Discard, nil))
 	}
-	service, err := newService(42, 99, "Bosun", fixedSelector{}, logger, mustExecutor(t, 1, 1), mustExecutor(t, workers, capacity))
+	service, err := newService(42, 99, "Bosun", fixedSelector{}, logger, mustExecutor(t, 1, 1), mustExecutor(t, workers, capacity), options...)
 	if err != nil {
 		t.Fatalf("NewService() error = %v", err)
+	}
+	t.Cleanup(func() { closeService(t, service) })
+	return service
+}
+
+func newInteractionServiceWithSelector(t *testing.T, selector ReplySelector, interactions *executor) *Service {
+	t.Helper()
+	service, err := newService(
+		42, 99, "Bosun", selector, slog.New(slog.NewTextHandler(io.Discard, nil)),
+		mustExecutor(t, 1, 1), interactions,
+	)
+	if err != nil {
+		t.Fatalf("newService() error = %v", err)
 	}
 	t.Cleanup(func() { closeService(t, service) })
 	return service
@@ -240,4 +415,19 @@ func assertInteractionUpdate(t *testing.T, update discord.MessageUpdate, content
 		t.Fatalf("interaction content = %v, want %q", update.Content, content)
 	}
 	assertAllowedMentionsDisabled(t, update.AllowedMentions)
+}
+
+func assertOneFailureUpdate(t *testing.T, edits <-chan discord.MessageUpdate) {
+	t.Helper()
+	select {
+	case update := <-edits:
+		assertInteractionUpdate(t, update, interactionFailureMessage)
+	case <-time.After(time.Second):
+		t.Fatal("the deferred interaction response was not finalized")
+	}
+	select {
+	case <-edits:
+		t.Fatal("the deferred interaction response received multiple final updates")
+	case <-time.After(20 * time.Millisecond):
+	}
 }

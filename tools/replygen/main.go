@@ -18,6 +18,12 @@ type templateSet struct {
 	closings []string
 }
 
+type typedTemplateSet struct {
+	category string
+	openings [3][]string
+	closings []string
+}
+
 type reply struct {
 	ID       string `json:"id"`
 	Locale   string `json:"locale"`
@@ -55,7 +61,7 @@ var sets = []templateSet{
 		closings: []string{
 			"Spróbuj ponownie, tym razem z choćby szkicem celu.",
 			"Dodaj konkret, zanim reszta zdania zacznie panikować.",
-			"Bosun nie naprawi kursu, którego nikt nie wyznaczył.",
+			"Nie naprawię kursu, którego nikt nie wyznaczył.",
 			"Następna wersja niech zawiera także powód.",
 			"Zbierz fakty, zanim znowu wypuścisz ten balon.",
 			"Daj temu minutę myślenia i drugi przecinek.",
@@ -96,7 +102,7 @@ var sets = []templateSet{
 			"Ogarnij podstawy, zanim znowu każesz mi sprzątać pokład.",
 			"Dodaj fakty, bo sama mina eksperta niczego nie dowozi.",
 			"Przestań testować cierpliwość, a zacznij testować założenia.",
-			"Bosun ma riposty, ale nie ma budżetu na cudze lenistwo.",
+			"Mam riposty, ale nie mam budżetu na cudze lenistwo.",
 			"Następnym razem przynieś problem po kontakcie z myśleniem.",
 			"Ten bajzel potrzebuje planu, nie kolejnego wykrzyknika.",
 			"Wróć, gdy pytanie przestanie udawać notatkę z drzemki.",
@@ -110,7 +116,7 @@ var sets = []templateSet{
 			"Podaj kontekst, zamiast urządzać konkurs zgadywania.",
 			"Twój następny ruch niech obejmuje choć jedną przesłankę.",
 			"To wymaga korekty, a nie kolejnej warstwy pewności siebie.",
-			"Najpierw pomyśl, potem kliknij, a na końcu wołaj Bosuna.",
+			"Najpierw pomyśl, potem kliknij, a na końcu wołaj pomoc.",
 			"Nie oczekuj precyzji po wejściu zrobionym na odwal się.",
 			"Zamień ten bełkot w zadanie, a wtedy pogadamy.",
 			"Podnieś jakość wejścia, bo dno już dawno zostało zmierzone.",
@@ -140,7 +146,7 @@ var sets = []templateSet{
 		closings: []string{
 			"Posprzątaj ten burdel, zanim znów zawołasz mnie do raportu.",
 			"Przynieś konkrety albo przestań marnować tlen w kanale.",
-			"Bosun nie będzie niańczył pytania, które odmawia dorosnąć.",
+			"Nie będę niańczył pytania, które odmawia dorosnąć.",
 			"Zacznij myśleć przed wysłaniem, bo kolejność ma znaczenie.",
 			"Wyłącz autopilota, bo właśnie kieruje cię prosto w kompromitację.",
 			"Następny taki wpis dostanie wyłącznie rachunek za sprzątanie.",
@@ -149,7 +155,7 @@ var sets = []templateSet{
 			"Zrób choć połowę roboty, zanim zażądasz całej odpowiedzi.",
 			"Usuń bełkot, dodaj dane i przestań grać zdziwionego.",
 			"To jest ten moment, kiedy wymówki przestają być zabawne.",
-			"Nie wycieraj sobie Bosunem własnego braku planu.",
+			"Nie zasłaniaj mną własnego braku planu.",
 			"Oszczędź nam przedstawienia i podaj pieprzone wymagania.",
 			"Ten statek ma ster, więc przestań prowadzić go czołem.",
 			"Wróć po krótkiej rozmowie z faktami i długiej z rozsądkiem.",
@@ -191,8 +197,9 @@ func main() {
 }
 
 func generate() ([]reply, error) {
-	result := make([]reply, 0, 1000)
-	seen := make(map[string]struct{}, 1000)
+	result := make([]reply, 0, 4000)
+	seenIDs := make(map[string]struct{}, 4000)
+	seenTexts := make(map[string]struct{}, 4000)
 
 	for _, set := range sets {
 		sequence := 0
@@ -200,25 +207,72 @@ func generate() ([]reply, error) {
 			for _, closing := range set.closings {
 				sequence++
 				text := opening + " " + closing
-				if _, exists := seen[text]; exists {
-					return nil, fmt.Errorf("duplicate reply text in %s at %d", set.name, sequence)
-				}
-				seen[text] = struct{}{}
-				result = append(result, reply{
+				entry := reply{
 					ID:       fmt.Sprintf("%s-%03d", set.name, sequence),
 					Locale:   "pl",
 					Category: "generic",
 					Tier:     set.tier,
 					Text:     text,
-				})
+				}
+				if err := appendUnique(&result, seenIDs, seenTexts, entry); err != nil {
+					return nil, err
+				}
 			}
 		}
 	}
 
-	if len(result) != 1000 {
-		return nil, fmt.Errorf("generated %d replies, want 1000", len(result))
+	counts := make(map[string]int, len(typedSets)*3)
+	for _, set := range typedSets {
+		for tierIndex, openings := range set.openings {
+			tier := tierIndex + 1
+			if len(openings) != 10 || len(set.closings) != 10 {
+				return nil, fmt.Errorf("category %s tier %d has %d openings and %d closings, want 10 each", set.category, tier, len(openings), len(set.closings))
+			}
+			sequence := 0
+			for _, opening := range openings {
+				for _, closing := range set.closings {
+					sequence++
+					entry := reply{
+						ID:       fmt.Sprintf("%s-%d-%03d", set.category, tier, sequence),
+						Locale:   "pl",
+						Category: set.category,
+						Tier:     tier,
+						Text:     opening + " " + closing,
+					}
+					if err := appendUnique(&result, seenIDs, seenTexts, entry); err != nil {
+						return nil, err
+					}
+					counts[fmt.Sprintf("%s-%d", set.category, tier)]++
+				}
+			}
+		}
+	}
+
+	if len(result) != 4000 {
+		return nil, fmt.Errorf("generated %d replies, want 4000", len(result))
+	}
+	for _, set := range typedSets {
+		for tier := 1; tier <= 3; tier++ {
+			key := fmt.Sprintf("%s-%d", set.category, tier)
+			if counts[key] != 100 {
+				return nil, fmt.Errorf("category %s tier %d has %d replies, want 100", set.category, tier, counts[key])
+			}
+		}
 	}
 	return result, nil
+}
+
+func appendUnique(result *[]reply, seenIDs, seenTexts map[string]struct{}, entry reply) error {
+	if _, exists := seenIDs[entry.ID]; exists {
+		return fmt.Errorf("duplicate reply ID %q", entry.ID)
+	}
+	if _, exists := seenTexts[entry.Text]; exists {
+		return fmt.Errorf("duplicate reply text for %q", entry.ID)
+	}
+	seenIDs[entry.ID] = struct{}{}
+	seenTexts[entry.Text] = struct{}{}
+	*result = append(*result, entry)
+	return nil
 }
 
 func write(path string, data []byte) error {

@@ -7,22 +7,32 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/disgoorg/snowflake/v2"
+
+	"github.com/smykla-skalski/bosun/internal/openrouter"
 )
 
 const (
-	DefaultBotHandle = "Bosun"
-	DefaultPort      = 8080
+	DefaultBotHandle                 = "Bosun"
+	DefaultPort                      = 8080
+	DefaultOpenRouterModel           = openrouter.ModelGeminiFlashLite
+	DefaultOpenRouterBalanceCooldown = 15 * time.Minute
+	DefaultOpenRouterRequestTimeout  = 5 * time.Second
 )
 
 type Config struct {
-	DiscordToken  string
-	ApplicationID snowflake.ID
-	GuildID       snowflake.ID
-	BotHandle     string
-	Port          int
-	LogLevel      slog.Level
+	DiscordToken              string
+	ApplicationID             snowflake.ID
+	GuildID                   snowflake.ID
+	BotHandle                 string
+	Port                      int
+	LogLevel                  slog.Level
+	OpenRouterAPIKey          string
+	OpenRouterModel           string
+	OpenRouterBalanceCooldown time.Duration
+	OpenRouterRequestTimeout  time.Duration
 }
 
 type LookupEnv func(string) (string, bool)
@@ -56,20 +66,47 @@ func FromEnv(lookup LookupEnv) (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
+	openRouterCooldown, err := readPositiveDuration(lookup, "OPENROUTER_BALANCE_COOLDOWN", DefaultOpenRouterBalanceCooldown)
+	if err != nil {
+		return Config{}, err
+	}
+	openRouterTimeout, err := readPositiveDuration(lookup, "OPENROUTER_REQUEST_TIMEOUT", DefaultOpenRouterRequestTimeout)
+	if err != nil {
+		return Config{}, err
+	}
 
 	handle := DefaultBotHandle
 	if value, ok := lookup("BOT_HANDLE"); ok && strings.TrimSpace(value) != "" {
 		handle = strings.TrimSpace(value)
 	}
+	openRouterModel := DefaultOpenRouterModel
+	if value, ok := lookup("OPENROUTER_MODEL"); ok && strings.TrimSpace(value) != "" {
+		openRouterModel = strings.TrimSpace(value)
+	}
+	if !openrouter.IsAllowedModel(openRouterModel) {
+		return Config{}, errors.New("OPENROUTER_MODEL is not allowlisted")
+	}
+	openRouterAPIKey := ""
+	if value, ok := lookup("OPENROUTER_API_KEY"); ok {
+		openRouterAPIKey = strings.TrimSpace(value)
+	}
 
 	return Config{
-		DiscordToken:  token,
-		ApplicationID: applicationID,
-		GuildID:       guildID,
-		BotHandle:     handle,
-		Port:          port,
-		LogLevel:      level,
+		DiscordToken:              token,
+		ApplicationID:             applicationID,
+		GuildID:                   guildID,
+		BotHandle:                 handle,
+		Port:                      port,
+		LogLevel:                  level,
+		OpenRouterAPIKey:          openRouterAPIKey,
+		OpenRouterModel:           openRouterModel,
+		OpenRouterBalanceCooldown: openRouterCooldown,
+		OpenRouterRequestTimeout:  openRouterTimeout,
 	}, nil
+}
+
+func (c Config) OpenRouterEnabled() bool {
+	return c.OpenRouterAPIKey != ""
 }
 
 func (c Config) Address() string {
@@ -118,4 +155,16 @@ func readLogLevel(lookup LookupEnv) (slog.Level, error) {
 		return 0, errors.New("LOG_LEVEL must be debug, info, warn, or error")
 	}
 	return level, nil
+}
+
+func readPositiveDuration(lookup LookupEnv, name string, fallback time.Duration) (time.Duration, error) {
+	value, ok := lookup(name)
+	if !ok || strings.TrimSpace(value) == "" {
+		return fallback, nil
+	}
+	duration, err := time.ParseDuration(strings.TrimSpace(value))
+	if err != nil || duration <= 0 {
+		return 0, fmt.Errorf("%s must be a positive duration", name)
+	}
+	return duration, nil
 }
