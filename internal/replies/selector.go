@@ -24,22 +24,23 @@ type Selection struct {
 }
 
 type Selector struct {
-	mu      sync.Mutex
-	catalog Catalog
-	users   map[string]*userState
-	now     func() time.Time
-	index   func(int) int
-	window  time.Duration
+	mu             sync.Mutex
+	catalog        Catalog
+	users          map[string]*userState
+	now            func() time.Time
+	index          func(int) int
+	window         time.Duration
+	accessSequence uint64
 }
 
 type userState struct {
-	activity      [activityLimit]time.Time
-	activityStart int
-	activityCount int
-	recent        [recentCapacity]string
-	recentStart   int
-	recentCount   int
-	lastSeen      time.Time
+	activity       [activityLimit]time.Time
+	activityStart  int
+	activityCount  int
+	recent         [recentCapacity]string
+	recentStart    int
+	recentCount    int
+	accessSequence uint64
 }
 
 type SelectorOption func(*Selector)
@@ -99,9 +100,10 @@ func (s *Selector) Select(userID string) (Selection, error) {
 		state = &userState{}
 		s.users[userID] = state
 	}
+	s.accessSequence++
+	state.accessSequence = s.accessSequence
 
 	triggerCount := state.record(now, s.window)
-	state.lastSeen = now
 	tier := tierForCount(triggerCount)
 	reply, err := s.pick(s.catalog.byTier[tier], state)
 	if err != nil {
@@ -114,11 +116,11 @@ func (s *Selector) Select(userID string) (Selection, error) {
 
 func (s *Selector) evictLeastRecentlySeen() {
 	oldestUserID := ""
-	var oldestTime time.Time
+	var oldestSequence uint64
 	for userID, state := range s.users {
-		if oldestUserID == "" || state.lastSeen.Before(oldestTime) || state.lastSeen.Equal(oldestTime) && userID < oldestUserID {
+		if oldestUserID == "" || state.accessSequence < oldestSequence {
 			oldestUserID = userID
-			oldestTime = state.lastSeen
+			oldestSequence = state.accessSequence
 		}
 	}
 	if oldestUserID != "" {

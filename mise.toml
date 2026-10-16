@@ -5,6 +5,10 @@ go = "1.27.2"
 description = "Download Go modules"
 run = "go mod download"
 
+[tasks.tidy]
+description = "Update Go module metadata"
+run = "go mod tidy"
+
 [tasks.fmt]
 description = "Format Go source files"
 run = "find . -name '*.go' -not -path './.git/*' -exec gofmt -w {} +"
@@ -12,8 +16,11 @@ run = "find . -name '*.go' -not -path './.git/*' -exec gofmt -w {} +"
 [tasks."fmt:check"]
 description = "Check Go source formatting"
 run = '''
-files="$(find . -name '*.go' -not -path './.git/*' -exec gofmt -l {} +)"
-test -z "$files" || { printf '%s\n' "$files"; exit 1; }
+file_list="$(mktemp)"
+trap 'rm -f "$file_list"' EXIT
+find . -name '*.go' -not -path './.git/*' -print0 > "$file_list" || exit 1
+output="$(xargs -0 gofmt -l < "$file_list")" || exit 1
+test -z "$output" || { printf '%s\n' "$output"; exit 1; }
 '''
 
 [tasks.lint]
@@ -34,7 +41,7 @@ run = "go test -run '^$' -bench . -benchmem ./..."
 
 [tasks.build]
 description = "Build the Bosun binary"
-run = "go build -trimpath -o build/bosun ./cmd/bosun"
+run = "mkdir -p build && go build -trimpath -o build/bosun ./cmd/bosun"
 
 [tasks."replies:generate"]
 description = "Generate the Polish reply catalog"

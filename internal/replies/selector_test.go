@@ -102,7 +102,7 @@ func TestSelectorKeepsActiveUserState(t *testing.T) {
 	}
 }
 
-func TestSelectorCapsUsersAndEvictsLeastRecentlySeen(t *testing.T) {
+func TestSelectorCapsUsersWithEqualClockAccessOrder(t *testing.T) {
 	t.Parallel()
 
 	now := time.Date(2026, time.October, 16, 12, 0, 0, 0, time.UTC)
@@ -112,13 +112,11 @@ func TestSelectorCapsUsersAndEvictsLeastRecentlySeen(t *testing.T) {
 		if _, err := selector.Select(userID); err != nil {
 			t.Fatalf("Select(%q) error = %v", userID, err)
 		}
-		now = now.Add(time.Millisecond)
 	}
 
 	if _, err := selector.Select("user-0000"); err != nil {
 		t.Fatalf("Select() refreshed user error = %v", err)
 	}
-	now = now.Add(time.Millisecond)
 	if _, err := selector.Select("overflow-user"); err != nil {
 		t.Fatalf("Select() overflow user error = %v", err)
 	}
