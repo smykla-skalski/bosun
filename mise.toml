@@ -1,0 +1,61 @@
+[tools]
+go = "1.27.2"
+
+[tasks.deps]
+description = "Download Go modules"
+run = "go mod download"
+
+[tasks.fmt]
+description = "Format Go source files"
+run = "find . -name '*.go' -not -path './.git/*' -exec gofmt -w {} +"
+
+[tasks."fmt:check"]
+description = "Check Go source formatting"
+run = '''
+files="$(find . -name '*.go' -not -path './.git/*' -exec gofmt -l {} +)"
+test -z "$files" || { printf '%s\n' "$files"; exit 1; }
+'''
+
+[tasks.lint]
+description = "Run static Go checks"
+run = "go vet ./..."
+
+[tasks.test]
+description = "Run Go tests"
+run = "go test ./..."
+
+[tasks."test:race"]
+description = "Run Go tests with the race detector"
+run = "go test -race ./..."
+
+[tasks.bench]
+description = "Run Go benchmarks"
+run = "go test -run '^$' -bench . -benchmem ./..."
+
+[tasks.build]
+description = "Build the Bosun binary"
+run = "go build -trimpath -o build/bosun ./cmd/bosun"
+
+[tasks."replies:generate"]
+description = "Generate the Polish reply catalog"
+run = "go run ./tools/replygen"
+
+[tasks."replies:check"]
+description = "Check the Polish reply catalog"
+run = "go run ./tools/replygen -check"
+
+[tasks."docker:build"]
+description = "Build the container image"
+run = "docker build --tag bosun:local ."
+
+[tasks."fly:validate"]
+description = "Validate the Fly configuration"
+run = "fly config validate --config fly.toml"
+
+[tasks."fly:deploy"]
+description = "Deploy Bosun to Fly"
+run = "fly deploy --config fly.toml"
+
+[tasks.check]
+description = "Run all local checks"
+depends = ["fmt:check", "replies:check", "lint", "test", "test:race", "build"]
