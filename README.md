@@ -76,6 +76,10 @@ OpenRouter returns only one index. Bosun displays the selected local candidate a
 
 Bosun reserves each candidate batch. It adds only the committed reply to the recent reply history.
 
+Each candidate batch has eight distinct setup variants and eight distinct punchline variants.
+
+Each reply uses two sentence roles. The first sentence fits the message, and the second adds a separate comic scene.
+
 The OpenRouter request requires Zero Data Retention, denies data collection, and requires JSON Schema support. It also disables the response cache.
 
 OpenRouter still sees the API key, source address, request time, model, fixed labels, candidate texts, token data, cost, and workspace link.
@@ -104,6 +108,8 @@ The `/readyz` endpoint returns success after the Discord gateway becomes ready.
 Use [docs/deployment.md](docs/deployment.md) to create, deploy, install, and test Bosun.
 
 The Fly tasks use `bosun-discord-bot` unless `FLY_APP_NAME` selects the documented fallback name.
+
+A push to `main` runs every local check and deploys one healthy Fly Machine through GitHub Actions.
 
 The normal OpenRouter key endpoint reports only the inference key limit. It does not report the complete account balance.
 
@@ -145,6 +151,7 @@ List all tasks with `mise tasks ls`.
 | --- | --- |
 | `mise run check` | Run the format, catalog, lint, test, race, and build checks. |
 | `mise run replies:generate` | Create the 4,000 reply catalog. |
+| `mise run workflow:check` | Check the GitHub Actions workflow. |
 | `mise run docker:build` | Build `bosun-discord-bot:local`. |
 | `mise run fly:validate` | Validate `fly.toml` with strict checks. |
 | `mise run fly:deploy` | Deploy one private Fly Machine in Frankfurt. |

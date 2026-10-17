@@ -107,6 +107,10 @@ Bosun does not send member words, names, links, files, identifiers, timestamps, 
 
 Bosun selects eight vetted static replies for each event. Candidate zero is the guaranteed fallback.
 
+Each candidate batch has distinct setup and punchline variants. Consecutive replies do not reuse either variant.
+
+The first sentence fits the message profile. The second sentence adds a separate comic scene instead of the same criticism.
+
 OpenRouter receives the fixed profile and the eight indexed candidate texts. It returns only one integer index.
 
 Bosun displays the selected local candidate. It never displays text from the model response.
@@ -180,6 +184,18 @@ mise run fly:deploy
 ```
 
 The deploy command blocks new public IP addresses and keeps one Machine in `fra`.
+
+## Enable automatic deployment
+
+Create one app-scoped Fly deploy token for the `bosun-discord-bot` application.
+
+Store that token as the `FLY_API_TOKEN` repository secret.
+
+Each push to `main` runs `mise run check`, verifies the required Fly secrets, and deploys one Machine.
+
+The workflow rejects multiple Machines before deployment. It verifies one started Machine and all health checks after deployment.
+
+The production token does not need access to another Fly application.
 
 ## Verify the release
 
