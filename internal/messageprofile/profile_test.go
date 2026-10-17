@@ -20,19 +20,19 @@ func TestBuildClassifiesMessageShape(t *testing.T) {
 			name:     "angry direct question",
 			text:     "CZY TY TO W OGÓLE ZROBISZ?! KURWA",
 			category: "question",
-			want:     Profile{Version: Version, Trigger: "mention", Category: "question", Form: "question", Structure: "simple", LengthBucket: "short", Punctuation: "mixed", Tone: "angry", Humor: "none", Directness: "direct", Casing: "upper", ProfanityStrength: "strong", Spice: "savage"},
+			want:     Profile{Version: Version, Trigger: "mention", Category: "question", ConversationRole: "direct_address", QuestionKind: "information", ResponseMode: "answer_then_roast", Form: "question", Structure: "simple", LengthBucket: "short", Punctuation: "mixed", Tone: "angry", Humor: "none", Directness: "direct", Casing: "upper", ProfanityStrength: "strong", Spice: "savage"},
 		},
 		{
 			name:     "happy playful fragment",
 			text:     "super haha 😂",
 			category: "joke",
-			want:     Profile{Version: Version, Trigger: "mention", Category: "joke", Form: "fragment", Structure: "minimal", LengthBucket: "tiny", Punctuation: "none", Tone: "joking", Humor: "playful", Directness: "indirect", Casing: "lower", ProfanityStrength: "none", Spice: "savage"},
+			want:     Profile{Version: Version, Trigger: "mention", Category: "joke", ConversationRole: "direct_address", QuestionKind: "none", ResponseMode: "counter_roast", Form: "fragment", Structure: "minimal", LengthBucket: "tiny", Punctuation: "none", Tone: "joking", Humor: "playful", Directness: "indirect", Casing: "lower", ProfanityStrength: "none", Spice: "savage"},
 		},
 		{
 			name:     "sad compound statement",
 			text:     "Jest mi smutno, ale jutro będzie lepiej.",
 			category: "generic",
-			want:     Profile{Version: Version, Trigger: "mention", Category: "generic", Form: "statement", Structure: "compound", LengthBucket: "short", Punctuation: "period", Tone: "sad", Humor: "none", Directness: "indirect", Casing: "mixed", ProfanityStrength: "none", Spice: "savage"},
+			want:     Profile{Version: Version, Trigger: "mention", Category: "generic", ConversationRole: "direct_address", QuestionKind: "none", ResponseMode: "counter_roast", Form: "statement", Structure: "compound", LengthBucket: "short", Punctuation: "period", Tone: "sad", Humor: "none", Directness: "indirect", Casing: "mixed", ProfanityStrength: "none", Spice: "savage"},
 		},
 	}
 	for _, test := range tests {
@@ -45,6 +45,32 @@ func TestBuildClassifiesMessageShape(t *testing.T) {
 			}
 			if !reflect.DeepEqual(got, test.want) {
 				t.Fatalf("Build() = %#v, want %#v", got, test.want)
+			}
+		})
+	}
+}
+
+func TestProfileRejectsInconsistentConversationContext(t *testing.T) {
+	t.Parallel()
+
+	valid, err := Build("anonimowa treść", "Bosun", "mention", "presence", "harsh")
+	if err != nil {
+		t.Fatalf("Build() error = %v", err)
+	}
+	tests := []struct {
+		name string
+		edit func(*Profile)
+	}{
+		{name: "conversation role", edit: func(profile *Profile) { profile.ConversationRole = "continuation" }},
+		{name: "question kind", edit: func(profile *Profile) { profile.QuestionKind = "information" }},
+		{name: "response mode", edit: func(profile *Profile) { profile.ResponseMode = "counter_roast" }},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			profile := valid
+			test.edit(&profile)
+			if profile.Validate() == nil {
+				t.Fatal("Validate() accepted inconsistent conversation labels")
 			}
 		})
 	}
@@ -67,7 +93,7 @@ func TestProfileJSONHasExactKeysAndNoCanaryData(t *testing.T) {
 		t.Fatalf("json.Unmarshal() error = %v", err)
 	}
 	wantKeys := []string{
-		"version", "trigger", "category", "form", "structure", "length_bucket",
+		"version", "trigger", "category", "conversation_role", "question_kind", "response_mode", "form", "structure", "length_bucket",
 		"punctuation", "tone", "humor", "directness", "casing", "profanity_strength", "spice",
 	}
 	if len(fields) != len(wantKeys) {
@@ -83,6 +109,35 @@ func TestProfileJSONHasExactKeysAndNoCanaryData(t *testing.T) {
 		if strings.Contains(lower, forbidden) {
 			t.Errorf("profile contains canary %q", forbidden)
 		}
+	}
+}
+
+func TestBuildAddsAnonymousConversationContext(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name         string
+		trigger      string
+		category     string
+		wantRole     string
+		wantQuestion string
+		wantMode     string
+	}{
+		{name: "presence", trigger: "mention", category: "presence", wantRole: "direct_address", wantQuestion: "presence", wantMode: "social_banter"},
+		{name: "reaction", trigger: "reply", category: "reaction", wantRole: "continuation", wantQuestion: "none", wantMode: "reaction_banter"},
+		{name: "opinion command", trigger: "ask", category: "opinion", wantRole: "explicit_request", wantQuestion: "opinion", wantMode: "answer_then_roast"},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+			profile, err := Build("anonimowa treść", "Bosun", test.trigger, test.category, "harsh")
+			if err != nil {
+				t.Fatalf("Build() error = %v", err)
+			}
+			if profile.ConversationRole != test.wantRole || profile.QuestionKind != test.wantQuestion || profile.ResponseMode != test.wantMode {
+				t.Fatalf("conversation context = %#v", profile)
+			}
+		})
 	}
 }
 
@@ -245,9 +300,12 @@ func TestProfileValidateRejectsEachUnknownLabel(t *testing.T) {
 		name string
 		edit func(*Profile)
 	}{
-		{"version", func(p *Profile) { p.Version = "v2" }},
+		{"version", func(p *Profile) { p.Version = "v3" }},
 		{"trigger", func(p *Profile) { p.Trigger = "private-trigger" }},
 		{"category", func(p *Profile) { p.Category = "private-category" }},
+		{"conversation role", func(p *Profile) { p.ConversationRole = "private-role" }},
+		{"question kind", func(p *Profile) { p.QuestionKind = "private-question" }},
+		{"response mode", func(p *Profile) { p.ResponseMode = "private-response" }},
 		{"form", func(p *Profile) { p.Form = "private-form" }},
 		{"structure", func(p *Profile) { p.Structure = "private-structure" }},
 		{"length", func(p *Profile) { p.LengthBucket = "private-length" }},
@@ -288,7 +346,7 @@ func FuzzBuildUsesOnlyFixedLabels(f *testing.F) {
 		if err != nil {
 			t.Fatalf("json.Marshal() error = %v", err)
 		}
-		if len(encoded) > 320 {
+		if len(encoded) > 448 {
 			t.Fatalf("profile size = %d", len(encoded))
 		}
 	})

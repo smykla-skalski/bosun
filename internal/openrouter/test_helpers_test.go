@@ -82,9 +82,11 @@ func validInput() Input {
 	return Input{
 		Profile: messageprofile.Profile{
 			Version: messageprofile.Version, Trigger: "ask", Category: "question", Form: "question",
+			ConversationRole: "explicit_request", QuestionKind: "information", ResponseMode: "answer_then_roast",
 			Structure: "simple", LengthBucket: "short", Punctuation: "question", Tone: "neutral",
 			Humor: "none", Directness: "direct", Casing: "lower", ProfanityStrength: "none", Spice: "sharp",
 		},
+		CandidateType: "question",
 		Candidates: [CandidateCount]string{
 			"Twój pomysł wszedł na pokład bez mapy i kompasu. Spróbuj ponownie, tym razem z choćby szkicem celu.",
 			"Twój pomysł wszedł na pokład bez mapy i kompasu. Dodaj konkret, zanim reszta zdania zacznie panikować.",

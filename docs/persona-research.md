@@ -2,7 +2,7 @@
 
 Bosun uses short Polish replies that combine dry irony, maritime language, and clear criticism of the user's current message or effort.
 
-The static catalog contains 4,000 original replies. The generator combines original sentence pairs and does not copy jokes from the research sources.
+The static catalog contains 6,400 original replies. The generator combines original sentence pairs and does not copy jokes from the research sources.
 
 ## Research sources
 
@@ -22,15 +22,15 @@ The static catalog contains 4,000 original replies. The generator combines origi
 
 ## Escalation tiers
 
-- Tier 1, `sharp`, contains 1,340 dry and corrective replies.
-- Tier 2, `harsh`, contains 1,330 stronger replies for the first two triggers.
-- Tier 3, `savage`, contains 1,330 profane replies from the third trigger.
+- Tier 1, `sharp`, contains 2,140 dry and corrective replies.
+- Tier 2, `harsh`, contains 2,130 stronger replies for the first two triggers.
+- Tier 3, `savage`, contains 2,130 profane replies from the third trigger.
 
 The selector counts triggers in a rolling ten-minute window. It excludes each user's 20 most recent reply identifiers from the next choice.
 
 ## Message categories
 
-The local classifier selects `generic`, `greeting`, `question`, `request`, `complaint`, `boast`, `insult`, `joke`, `praise`, `thanks`, or `challenge`.
+The local classifier selects 19 types. These types include social checks, status checks, opinions, stances, reactions, confusion, and acknowledgements.
 
 Each non-generic category contains 100 replies in each spice tier. The generic category keeps the original 1,000 replies.
 
@@ -38,7 +38,7 @@ The classifier ignores links, platform tags, code blocks, and custom emoji text.
 
 ## Dynamic reply profile
 
-The local profile uses only fixed labels. It describes the trigger, category, sentence form, structure, length, punctuation, tone, humor, directness, casing, profanity, and spice.
+The local profile uses only fixed labels. It describes the trigger, category, conversation role, question kind, response mode, form, tone, and spice.
 
 The profile can identify happy, angry, joking, sad, or neutral tone. It never contains the original words.
 

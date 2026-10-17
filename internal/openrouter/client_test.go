@@ -25,6 +25,7 @@ func TestCompleteSendsDecisionContractAndReturnsChoice(t *testing.T) {
 	}
 	input := validInput()
 	input.Profile = profile
+	input.CandidateType = profile.Category
 	var requests atomic.Int32
 	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 		requests.Add(1)
@@ -88,7 +89,7 @@ func assertDecisionRequest(t *testing.T, request *http.Request, input Input) {
 	assertRequestField(t, provider, "data_collection", "deny")
 	assertRequestField(t, provider, "require_parameters", true)
 	assertDecisionState(t, body["state"], input.Profile)
-	assertDecisionQuestion(t, body["questions"], input.Candidates)
+	assertDecisionQuestion(t, body["questions"], input.CandidateType, input.Candidates)
 }
 
 func assertDecisionState(t *testing.T, raw json.RawMessage, want messageprofile.Profile) {
@@ -105,12 +106,12 @@ func assertDecisionState(t *testing.T, raw json.RawMessage, want messageprofile.
 		t.Fatalf("decode state fields: %v", err)
 	}
 	assertExactKeys(t, fields,
-		"version", "trigger", "category", "form", "structure", "length_bucket",
+		"version", "trigger", "category", "conversation_role", "question_kind", "response_mode", "form", "structure", "length_bucket",
 		"punctuation", "tone", "humor", "directness", "casing", "profanity_strength", "spice",
 	)
 }
 
-func assertDecisionQuestion(t *testing.T, raw json.RawMessage, candidates [CandidateCount]string) {
+func assertDecisionQuestion(t *testing.T, raw json.RawMessage, candidateType string, candidates [CandidateCount]string) {
 	t.Helper()
 	var questions map[string]json.RawMessage
 	if err := json.Unmarshal(raw, &questions); err != nil {
@@ -133,7 +134,7 @@ func assertDecisionQuestion(t *testing.T, raw json.RawMessage, candidates [Candi
 		t.Fatalf("criteria count = %d, want %d", len(criteria), CandidateCount)
 	}
 	for index, candidate := range candidates {
-		assertRequestField(t, criteria, candidateIDs[index], candidate)
+		assertRequestField(t, criteria, candidateIDs[index], decisionCandidate(candidateType, candidate))
 		if err := replies.ValidateModelCandidate(candidate); err != nil {
 			t.Errorf("candidate %d is unsafe: %v", index, err)
 		}
@@ -154,10 +155,11 @@ func TestDecisionInstructionsKeepSafetyAndDataBoundaries(t *testing.T) {
 	t.Parallel()
 
 	for _, rule := range []string{
-		"anonimowego profilu wiadomości",
-		"Użyj wszystkich cech profilu",
-		"drugie zdanie dodaje nowy obraz komiczny",
-		"Nie preferuj próśb o dodatkowy kontekst",
+		"anonimowemu profilowi wiadomości",
+		"Pole category jest wiążącym typem wiadomości",
+		"conversation_role, question_kind i response_mode",
+		"Pierwsze zdanie riposty musi bezpośrednio odpowiadać typowi wiadomości",
+		"Nie wybieraj prośby o dodatkowy kontekst",
 	} {
 		if !strings.Contains(decisionInstructions, rule) {
 			t.Fatalf("decision instructions do not contain rule %q", rule)

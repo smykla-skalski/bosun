@@ -9,7 +9,7 @@ import (
 	"github.com/smykla-skalski/bosun/internal/messageprofile"
 )
 
-const decisionInstructions = `Wybierz gotową ripostę, która najlepiej pasuje do anonimowego profilu wiadomości w polu state. Użyj wszystkich cech profilu, zwłaszcza kategorii, formy, tonu, humoru, bezpośredniości, siły wulgaryzmów i poziomu ostrości. Preferuj bezpośrednią, zabawną i mocną ripostę. Preferuj ripostę, której drugie zdanie dodaje nowy obraz komiczny. Nie preferuj próśb o dodatkowy kontekst.`
+const decisionInstructions = `Wybierz gotową ripostę, która dokładnie odpowiada anonimowemu profilowi wiadomości w polu state. Pole category jest wiążącym typem wiadomości. Pola conversation_role, question_kind i response_mode określają rolę wypowiedzi oraz oczekiwany rodzaj odpowiedzi. Nie traktuj presence, status, opinion, agreement, disagreement, reaction, confusion ani acknowledgement jak zwykłego pytania. Pierwsze zdanie riposty musi bezpośrednio odpowiadać typowi wiadomości. Drugie zdanie może dodać nowy obraz komiczny, lecz musi pozostać związane z tym typem. Odrzuć ripostę, która błędnie nazywa wiadomość pytaniem, prośbą, planem lub argumentem. Preferuj mocną, konkretną i zabawną ripostę. Nie wybieraj prośby o dodatkowy kontekst.`
 
 type decisionRequest struct {
 	Model     string                 `json:"model"`
@@ -58,14 +58,14 @@ func decisionRequestFor(model string, input Input) decisionRequest {
 			Type:         "choice",
 			Instructions: decisionInstructions,
 			Criteria: decisionCriteria{
-				Candidate0: input.Candidates[0],
-				Candidate1: input.Candidates[1],
-				Candidate2: input.Candidates[2],
-				Candidate3: input.Candidates[3],
-				Candidate4: input.Candidates[4],
-				Candidate5: input.Candidates[5],
-				Candidate6: input.Candidates[6],
-				Candidate7: input.Candidates[7],
+				Candidate0: decisionCandidate(input.CandidateType, input.Candidates[0]),
+				Candidate1: decisionCandidate(input.CandidateType, input.Candidates[1]),
+				Candidate2: decisionCandidate(input.CandidateType, input.Candidates[2]),
+				Candidate3: decisionCandidate(input.CandidateType, input.Candidates[3]),
+				Candidate4: decisionCandidate(input.CandidateType, input.Candidates[4]),
+				Candidate5: decisionCandidate(input.CandidateType, input.Candidates[5]),
+				Candidate6: decisionCandidate(input.CandidateType, input.Candidates[6]),
+				Candidate7: decisionCandidate(input.CandidateType, input.Candidates[7]),
 			},
 		}},
 		Provider: providerPreferences{
@@ -74,6 +74,10 @@ func decisionRequestFor(model string, input Input) decisionRequest {
 			RequireParameters: true,
 		},
 	}
+}
+
+func decisionCandidate(candidateType string, text string) string {
+	return "Typ odpowiedzi: " + candidateType + ". Gotowa riposta: " + text
 }
 
 type keyResponse struct {
