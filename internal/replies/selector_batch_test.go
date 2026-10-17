@@ -17,6 +17,8 @@ func TestSelectBatchReturnsReservedCategoryCandidates(t *testing.T) {
 	}
 
 	ids := make(map[string]struct{}, CandidateCount)
+	openings := make(map[uint8]struct{}, CandidateCount)
+	punchlines := make(map[uint8]struct{}, CandidateCount)
 	for _, selection := range batch.Selections {
 		if selection.Reply.Category != CategoryComplaint {
 			t.Errorf("reply category = %q, want %q", selection.Reply.Category, CategoryComplaint)
@@ -31,6 +33,14 @@ func TestSelectBatchReturnsReservedCategoryCandidates(t *testing.T) {
 			t.Errorf("duplicate reply ID %q", selection.Reply.ID)
 		}
 		ids[selection.Reply.ID] = struct{}{}
+		if _, exists := openings[selection.Reply.OpeningVariant]; exists {
+			t.Errorf("duplicate opening variant %d", selection.Reply.OpeningVariant)
+		}
+		if _, exists := punchlines[selection.Reply.PunchlineVariant]; exists {
+			t.Errorf("duplicate punchline variant %d", selection.Reply.PunchlineVariant)
+		}
+		openings[selection.Reply.OpeningVariant] = struct{}{}
+		punchlines[selection.Reply.PunchlineVariant] = struct{}{}
 	}
 
 	next, err := selector.Select("user-1", CategoryComplaint)

@@ -22,6 +22,9 @@ func TestGenerateContracts(t *testing.T) {
 	counts := make(map[string]int, 33)
 	tierCounts := make(map[int]int, 3)
 	for _, entry := range entries {
+		if entry.OpeningVariant < 1 || entry.PunchlineVariant < 1 {
+			t.Fatalf("reply %q has invalid variants %d/%d", entry.ID, entry.OpeningVariant, entry.PunchlineVariant)
+		}
 		if _, exists := ids[entry.ID]; exists {
 			t.Fatalf("duplicate ID %q", entry.ID)
 		}
@@ -50,7 +53,7 @@ func TestGenerateContracts(t *testing.T) {
 	}
 }
 
-func TestPunchlinesDoNotRequestMoreContext(t *testing.T) {
+func TestPunchlinesHaveASeparateRole(t *testing.T) {
 	t.Parallel()
 
 	forbidden := []string{
@@ -62,6 +65,32 @@ func TestPunchlinesDoNotRequestMoreContext(t *testing.T) {
 		"przynieś ",
 		"wyjaśnij ",
 		"wróć z ",
+		"argument",
+		"dane",
+		"diagnoz",
+		"dowcip",
+		"fakt",
+		"humor",
+		"komplement",
+		"kontekst",
+		"logik",
+		"medal",
+		"myśl",
+		"obelg",
+		"plan",
+		"podzięk",
+		"pochwa",
+		"prośb",
+		"puent",
+		"pytan",
+		"skarg",
+		"szczegół",
+		"treść",
+		"wdzięcz",
+		"wymagan",
+		"wyzwisk",
+		"wyzwan",
+		"żart",
 	}
 	check := func(group string, punchlines []string) {
 		t.Helper()
@@ -69,16 +98,16 @@ func TestPunchlinesDoNotRequestMoreContext(t *testing.T) {
 			lower := strings.ToLower(punchline)
 			for _, phrase := range forbidden {
 				if strings.Contains(lower, phrase) {
-					t.Errorf("%s punchline %q requests more context", group, punchline)
+					t.Errorf("%s punchline %q overlaps the setup role", group, punchline)
 				}
 			}
 		}
 	}
 
 	for _, set := range sets {
-		check(set.name, set.closings)
+		check(set.name, set.punchlines)
 	}
 	for _, set := range typedSets {
-		check(set.category, set.closings)
+		check(set.category, set.punchlines)
 	}
 }

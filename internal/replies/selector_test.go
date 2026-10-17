@@ -79,6 +79,12 @@ func TestSelectorKeepsRecentRepliesAfterQuietWindow(t *testing.T) {
 	if second.Reply.ID == first.Reply.ID {
 		t.Fatalf("Select() repeated recent reply %q after quiet window", first.Reply.ID)
 	}
+	if second.Reply.OpeningVariant == first.Reply.OpeningVariant {
+		t.Fatalf("Select() repeated opening variant %d", first.Reply.OpeningVariant)
+	}
+	if second.Reply.PunchlineVariant == first.Reply.PunchlineVariant {
+		t.Fatalf("Select() repeated punchline variant %d", first.Reply.PunchlineVariant)
+	}
 }
 
 func TestSelectorUsesRequestedCategory(t *testing.T) {

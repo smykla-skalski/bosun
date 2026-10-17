@@ -37,7 +37,7 @@ const (
 	FaultTransport       = "transport_error"
 )
 
-const systemPrompt = `Wybierz indeks jednej z ośmiu gotowych odpowiedzi. Dopasuj wybór wyłącznie do stałych etykiet profilu. Preferuj bezpośrednią, zabawną i mocną ripostę zgodną z typem, tonem i kształtem profilu. Nie preferuj próśb o dodatkowy kontekst. Nie zmieniaj tekstu odpowiedzi. Zwróć tylko wymagany obiekt JSON.`
+const systemPrompt = `Wybierz indeks jednej z ośmiu gotowych odpowiedzi. Dopasuj wybór wyłącznie do stałych etykiet profilu. Preferuj bezpośrednią, zabawną i mocną ripostę zgodną z typem, tonem i kształtem profilu. Preferuj odpowiedź, której drugie zdanie dodaje nowy obraz zamiast powtarzać pierwsze. Nie preferuj próśb o dodatkowy kontekst. Nie zmieniaj tekstu odpowiedzi. Zwróć tylko wymagany obiekt JSON.`
 
 type Config struct {
 	APIKey          string
