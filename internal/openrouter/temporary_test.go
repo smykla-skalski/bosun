@@ -18,7 +18,7 @@ func TestForbiddenInFlightBudgetUsesRetryAfterOnly(t *testing.T) {
 	var completions atomic.Int32
 	var keyChecks atomic.Int32
 	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
-		if request.URL.Path == "/key" {
+		if request.URL.Path == "/v1/key" {
 			keyChecks.Add(1)
 		}
 		if completions.Add(1) == 1 {
@@ -178,7 +178,7 @@ func runUnreadableTemporaryStatusTest(t *testing.T, status int, body func() io.R
 		return testResponse(http.StatusOK, completionJSON("usługa wróciła"), ""), nil
 	})}
 	client, err := New(Config{
-		APIKey: "test-key", Model: ModelGeminiFlashLite, BalanceCooldown: 15 * time.Minute, RequestTimeout: 5 * time.Second,
+		APIKey: "test-key", Model: ModelJev, BalanceCooldown: 15 * time.Minute, RequestTimeout: 5 * time.Second,
 	}, WithBaseURL("https://openrouter.test"), WithHTTPClient(httpClient), WithClock(clock.Now))
 	if err != nil {
 		t.Fatalf("New() error = %v", err)

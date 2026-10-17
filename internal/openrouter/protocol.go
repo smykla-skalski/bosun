@@ -9,14 +9,34 @@ import (
 	"github.com/smykla-skalski/bosun/internal/messageprofile"
 )
 
-type completionRequest struct {
-	Model               string              `json:"model"`
-	Messages            []message           `json:"messages"`
-	Stream              bool                `json:"stream"`
-	MaxCompletionTokens int                 `json:"max_completion_tokens"`
-	ReasoningEffort     string              `json:"reasoning_effort"`
-	Provider            providerPreferences `json:"provider"`
-	ResponseFormat      responseFormat      `json:"response_format"`
+const decisionInstructions = `Wybierz gotową ripostę, która najlepiej pasuje do anonimowego profilu wiadomości w polu state. Użyj wszystkich cech profilu, zwłaszcza kategorii, formy, tonu, humoru, bezpośredniości, siły wulgaryzmów i poziomu ostrości. Preferuj bezpośrednią, zabawną i mocną ripostę. Preferuj ripostę, której drugie zdanie dodaje nowy obraz komiczny. Nie preferuj próśb o dodatkowy kontekst.`
+
+type decisionRequest struct {
+	Model     string                 `json:"model"`
+	State     messageprofile.Profile `json:"state"`
+	Questions decisionQuestions      `json:"questions"`
+	Provider  providerPreferences    `json:"provider"`
+}
+
+type decisionQuestions struct {
+	Reply decisionChoiceQuestion `json:"reply"`
+}
+
+type decisionChoiceQuestion struct {
+	Type         string           `json:"type"`
+	Instructions string           `json:"instructions"`
+	Criteria     decisionCriteria `json:"criteria"`
+}
+
+type decisionCriteria struct {
+	Candidate0 string `json:"candidate_0"`
+	Candidate1 string `json:"candidate_1"`
+	Candidate2 string `json:"candidate_2"`
+	Candidate3 string `json:"candidate_3"`
+	Candidate4 string `json:"candidate_4"`
+	Candidate5 string `json:"candidate_5"`
+	Candidate6 string `json:"candidate_6"`
+	Candidate7 string `json:"candidate_7"`
 }
 
 type providerPreferences struct {
@@ -25,58 +45,35 @@ type providerPreferences struct {
 	RequireParameters bool   `json:"require_parameters"`
 }
 
-type responseFormat struct {
-	Type       string             `json:"type"`
-	JSONSchema jsonSchemaContract `json:"json_schema"`
+type decisionResponse struct {
+	Answers map[string]json.RawMessage `json:"answers"`
+	Error   *apiError                  `json:"error"`
 }
 
-type jsonSchemaContract struct {
-	Name   string       `json:"name"`
-	Strict bool         `json:"strict"`
-	Schema choiceSchema `json:"schema"`
-}
-
-type choiceSchema struct {
-	Type                 string           `json:"type"`
-	Properties           choiceProperties `json:"properties"`
-	Required             []string         `json:"required"`
-	AdditionalProperties bool             `json:"additionalProperties"`
-}
-
-type choiceProperties struct {
-	Choice integerChoice `json:"choice"`
-}
-
-type integerChoice struct {
-	Type        string              `json:"type"`
-	Description string              `json:"description"`
-	Enum        [CandidateCount]int `json:"enum"`
-}
-
-type decisionPayload struct {
-	Profile    messageprofile.Profile            `json:"profile"`
-	Candidates [CandidateCount]decisionCandidate `json:"candidates"`
-}
-
-type decisionCandidate struct {
-	Index int    `json:"index"`
-	Text  string `json:"text"`
-}
-
-type message struct {
-	Role    string `json:"role"`
-	Content string `json:"content"`
-}
-
-type completionResponse struct {
-	Choices []struct {
-		Message struct {
-			Content string `json:"content"`
-		} `json:"message"`
-		FinishReason string    `json:"finish_reason"`
-		Error        *apiError `json:"error"`
-	} `json:"choices"`
-	Error *apiError `json:"error"`
+func decisionRequestFor(model string, input Input) decisionRequest {
+	return decisionRequest{
+		Model: model,
+		State: input.Profile,
+		Questions: decisionQuestions{Reply: decisionChoiceQuestion{
+			Type:         "choice",
+			Instructions: decisionInstructions,
+			Criteria: decisionCriteria{
+				Candidate0: input.Candidates[0],
+				Candidate1: input.Candidates[1],
+				Candidate2: input.Candidates[2],
+				Candidate3: input.Candidates[3],
+				Candidate4: input.Candidates[4],
+				Candidate5: input.Candidates[5],
+				Candidate6: input.Candidates[6],
+				Candidate7: input.Candidates[7],
+			},
+		}},
+		Provider: providerPreferences{
+			ZDR:               true,
+			DataCollection:    "deny",
+			RequireParameters: true,
+		},
+	}
 }
 
 type keyResponse struct {

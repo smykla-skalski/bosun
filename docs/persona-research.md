@@ -48,4 +48,4 @@ For each event, the selector supplies eight vetted static replies from the catal
 
 The selector reserves the batch until the decision completes. It records only the committed candidate as a recent reply.
 
-The model returns one index from zero through seven. The bot displays only the selected catalog text and never displays model text.
+Jev returns one typed candidate choice with probabilities and confidence. The bot displays only the selected catalog text and never displays model text.

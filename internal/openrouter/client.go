@@ -16,14 +16,15 @@ import (
 )
 
 const (
-	defaultBaseURL            = "https://openrouter.ai/api/v1"
-	ModelGeminiFlashLite      = "google/gemini-3.1-flash-lite"
+	defaultBaseURL            = "https://openrouter.ai/api"
+	ModelJev                  = "typesafe/jev-1.14"
 	CandidateCount            = 8
-	decisionMaxTokens         = 64
 	maximumResponseBytes      = 1 << 20
 	maximumInFlight           = 4
 	defaultRecoveryRetryDelay = 5 * time.Second
 	maximumRetryDelay         = 15 * time.Minute
+	decisionPath              = "/alpha/decisions"
+	keyPath                   = "/v1/key"
 
 	FaultCanceled        = "canceled"
 	FaultCredit          = "credit_unavailable"
@@ -36,8 +37,6 @@ const (
 	FaultTimeout         = "timeout"
 	FaultTransport       = "transport_error"
 )
-
-const systemPrompt = `Wybierz indeks jednej z ośmiu gotowych odpowiedzi. Dopasuj wybór wyłącznie do stałych etykiet profilu. Preferuj bezpośrednią, zabawną i mocną ripostę zgodną z typem, tonem i kształtem profilu. Preferuj odpowiedź, której drugie zdanie dodaje nowy obraz zamiast powtarzać pierwsze. Nie preferuj próśb o dodatkowy kontekst. Nie zmieniaj tekstu odpowiedzi. Zwróć tylko wymagany obiekt JSON.`
 
 type Config struct {
 	APIKey          string
@@ -215,51 +214,16 @@ func (c *Client) complete(ctx context.Context, input Input, generation uint64) (
 		return 0, newFault(FaultOverload)
 	}
 
-	payloadData, err := json.Marshal(decisionPayloadFor(input))
-	if err != nil {
-		return 0, newFault(FaultInvalidInput)
-	}
-	body, err := json.Marshal(completionRequest{
-		Model: c.model,
-		Messages: []message{
-			{Role: "system", Content: systemPrompt},
-			{Role: "user", Content: string(payloadData)},
-		},
-		Stream:              false,
-		MaxCompletionTokens: decisionMaxTokens,
-		ReasoningEffort:     "minimal",
-		Provider: providerPreferences{
-			ZDR:               true,
-			DataCollection:    "deny",
-			RequireParameters: true,
-		},
-		ResponseFormat: responseFormat{
-			Type: "json_schema",
-			JSONSchema: jsonSchemaContract{
-				Name:   "reply_choice",
-				Strict: true,
-				Schema: choiceSchema{
-					Type: "object",
-					Properties: choiceProperties{Choice: integerChoice{
-						Type:        "integer",
-						Description: "Indeks najlepiej dopasowanej riposty od 0 do 7.",
-						Enum:        [CandidateCount]int{0, 1, 2, 3, 4, 5, 6, 7},
-					}},
-					Required:             []string{"choice"},
-					AdditionalProperties: false,
-				},
-			},
-		},
-	})
+	body, err := json.Marshal(decisionRequestFor(c.model, input))
 	if err != nil {
 		return 0, newFault(FaultInvalidInput)
 	}
 
-	response, responseBody, err := c.do(ctx, http.MethodPost, "/chat/completions", body, generation)
+	response, responseBody, err := c.do(ctx, http.MethodPost, decisionPath, body, generation)
 	if err != nil {
 		return 0, err
 	}
-	var decoded completionResponse
+	var decoded decisionResponse
 	decodeErr := json.Unmarshal(responseBody, &decoded)
 	if statusNeedsImmediateClassification(response.StatusCode) {
 		apiErr := classifyAPIError(response.StatusCode, decoded.Error)
@@ -278,19 +242,7 @@ func (c *Client) complete(ctx context.Context, input Input, generation uint64) (
 	if response.StatusCode < http.StatusOK || response.StatusCode >= http.StatusMultipleChoices {
 		return 0, newFault(FaultRemote)
 	}
-	if len(decoded.Choices) == 0 {
-		return 0, newFault(FaultInvalidOutput)
-	}
-	choice := decoded.Choices[0]
-	if choice.Error != nil {
-		apiErr := classifyAPIError(http.StatusOK, choice.Error)
-		if apiErr == nil {
-			apiErr = newFault(FaultRemote)
-		}
-		c.applyFaultDeny(apiErr, response.Header.Get("Retry-After"), generation)
-		return 0, apiErr
-	}
-	return parseDecision(choice.Message.Content)
+	return parseDecision(decoded.Answers)
 }
 
 func validateInput(input Input) bool {
@@ -310,16 +262,8 @@ func validateInput(input Input) bool {
 	return true
 }
 
-func decisionPayloadFor(input Input) decisionPayload {
-	payload := decisionPayload{Profile: input.Profile}
-	for index, text := range input.Candidates {
-		payload.Candidates[index] = decisionCandidate{Index: index, Text: text}
-	}
-	return payload
-}
-
 func (c *Client) keyLimit(ctx context.Context, generation uint64) (*float64, error) {
-	response, responseBody, err := c.do(ctx, http.MethodGet, "/key", nil, generation)
+	response, responseBody, err := c.do(ctx, http.MethodGet, keyPath, nil, generation)
 	if err != nil {
 		return nil, err
 	}

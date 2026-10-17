@@ -16,7 +16,7 @@ func TestNullKeyLimitProbeReopensOnCreditError(t *testing.T) {
 	var completions atomic.Int32
 	var keyChecks atomic.Int32
 	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
-		if request.URL.Path == "/key" {
+		if request.URL.Path == "/v1/key" {
 			keyChecks.Add(1)
 			_, _ = io.WriteString(writer, `{"data":{"limit_remaining":null}}`)
 			return
@@ -47,7 +47,7 @@ func TestEmptyKeyLimitReopensCreditCircuit(t *testing.T) {
 	var completions atomic.Int32
 	var keyChecks atomic.Int32
 	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
-		if request.URL.Path == "/key" {
+		if request.URL.Path == "/v1/key" {
 			keyChecks.Add(1)
 			_, _ = io.WriteString(writer, `{"data":{"limit_remaining":0}}`)
 			return
@@ -94,8 +94,8 @@ func TestMalformedKeyLimitReopensCreditCircuit(t *testing.T) {
 				case 1:
 					return testResponse(http.StatusPaymentRequired, `{"error":{"code":402}}`, ""), nil
 				case 2:
-					if request.URL.Path != "/key" {
-						t.Fatalf("second request path = %q, want /key", request.URL.Path)
+					if request.URL.Path != "/v1/key" {
+						t.Fatalf("second request path = %q, want /v1/key", request.URL.Path)
 					}
 					return testResponse(http.StatusOK, test.body, ""), nil
 				default:
@@ -104,7 +104,7 @@ func TestMalformedKeyLimitReopensCreditCircuit(t *testing.T) {
 				}
 			})}
 			client, err := New(Config{
-				APIKey: "test-key", Model: ModelGeminiFlashLite, BalanceCooldown: 15 * time.Minute, RequestTimeout: 5 * time.Second,
+				APIKey: "test-key", Model: ModelJev, BalanceCooldown: 15 * time.Minute, RequestTimeout: 5 * time.Second,
 			}, WithBaseURL("https://openrouter.test"), WithHTTPClient(httpClient), WithClock(clock.Now))
 			if err != nil {
 				t.Fatalf("New() error = %v", err)

@@ -8,7 +8,7 @@ Bosun starts with the `harsh` spice level. It selects `savage` after the third t
 
 Bosun uses the selected static reply for every model fault. This fallback includes timeouts, overload, invalid output, and unavailable credit.
 
-In dynamic mode, Bosun selects eight vetted local replies. OpenRouter chooses one fixed index and never creates the displayed text.
+In dynamic mode, Bosun selects eight vetted local replies. Jev chooses one typed option and never creates the displayed text.
 
 Bosun replies to these events:
 
@@ -64,15 +64,15 @@ Use these optional variables when the defaults do not apply:
 | `PORT` | `8080` | Set the health server port. |
 | `LOG_LEVEL` | `info` | Set `debug`, `info`, `warn`, or `error`. |
 | `OPENROUTER_API_KEY` | unset | Enable dynamic replies. Keep static mode when this value is unset. |
-| `OPENROUTER_MODEL` | `google/gemini-3.1-flash-lite` | Use the only model that the code permits. |
+| `OPENROUTER_MODEL` | `typesafe/jev-1.14` | Use the only decision model that the code permits. |
 | `OPENROUTER_BALANCE_COOLDOWN` | `15m` | Set the wait period after a final credit error. |
 | `OPENROUTER_REQUEST_TIMEOUT` | `5s` | Set one OpenRouter request deadline. |
 
 Dynamic mode never sends raw or modified member text to OpenRouter. Raw member text stays inside the Bosun process.
 
-Bosun sends fixed profile labels and eight vetted static reply candidates. Each candidate has a fixed index from zero through seven.
+Bosun sends fixed profile labels and eight vetted static reply candidates. Each candidate has a fixed `candidate_0` through `candidate_7` identifier.
 
-OpenRouter returns only one index. Bosun displays the selected local candidate and never displays model text.
+Jev returns one typed choice, all option probabilities, and a confidence value. Bosun displays the selected local candidate and never displays model text.
 
 Bosun reserves each candidate batch. It adds only the committed reply to the recent reply history.
 
@@ -80,7 +80,7 @@ Each candidate batch has eight distinct setup variants and eight distinct punchl
 
 Each reply uses two sentence roles. The first sentence fits the message, and the second adds a separate comic scene.
 
-The OpenRouter request requires Zero Data Retention, denies data collection, and requires JSON Schema support. It also disables the response cache.
+The OpenRouter request requires Zero Data Retention, denies data collection, and requires Decisions API parameters. It also disables the response cache.
 
 OpenRouter still sees the API key, source address, request time, model, fixed labels, candidate texts, token data, cost, and workspace link.
 
@@ -121,7 +121,7 @@ After a recovery key check returns `429` or `503` without a valid positive `Retr
 
 After the cooldown, one request checks the key limit. Other concurrent requests use static replies through the recovery probe.
 
-A positive key limit or an explicit `limit_remaining:null` permits one shared completion probe. Only a successful probe closes the circuit.
+A positive key limit or an explicit `limit_remaining:null` permits one shared decision probe. Only a successful probe closes the circuit.
 
 Missing key data, null key data, or a missing limit restarts the long cooldown.
 
@@ -131,9 +131,9 @@ Any failed probe restarts the long cooldown, except `openrouter_in_flight_budget
 
 Bosun validates all profile labels and candidates before network access. An invalid value returns candidate zero.
 
-The completion body contains the model, two fixed-role messages, eight indexed candidates, a strict choice schema, token controls, and provider policy.
+The decision body contains the pinned Jev model, one anonymous state, one typed choice question, eight candidate criteria, and the provider policy.
 
-OpenRouter must return exactly one JSON object with one integer choice from zero through seven. Any other output returns candidate zero.
+OpenRouter must return one typed choice with all eight probabilities and a confidence value. Bosun rejects malformed or inconsistent decisions.
 
 Bosun omits user IDs, session IDs, metadata, traces, attribution headers, tools, and plugins.
 
@@ -141,7 +141,7 @@ OpenRouter can still connect a request to its API key and workspace. Its privacy
 
 Zero Data Retention stops endpoint retention. It does not stop request transfer to the selected model provider.
 
-See the official [privacy policy](https://openrouter.ai/privacy/), [ZDR guide](https://openrouter.ai/docs/guides/features/zdr), [provider routing guide](https://openrouter.ai/docs/guides/routing/provider-selection), [structured output guide](https://openrouter.ai/docs/guides/features/structured-outputs), and [response cache guide](https://openrouter.ai/docs/guides/features/response-caching).
+See the official [Jev model page](https://openrouter.ai/typesafe/jev-1.14), [privacy policy](https://openrouter.ai/privacy/), [ZDR guide](https://openrouter.ai/docs/guides/features/zdr), [provider routing guide](https://openrouter.ai/docs/guides/routing/provider-selection), and [response cache guide](https://openrouter.ai/docs/guides/features/response-caching).
 
 ## Main tasks
 
