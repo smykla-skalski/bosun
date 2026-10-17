@@ -35,14 +35,14 @@ func TestRecoveryKeyTemporaryFaultUsesBoundedDenyPeriod(t *testing.T) {
 			var keyChecks atomic.Int32
 			server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 				switch request.URL.Path {
-				case "/chat/completions":
+				case "/alpha/decisions":
 					if completions.Add(1) == 1 {
 						writer.WriteHeader(http.StatusPaymentRequired)
 						_, _ = io.WriteString(writer, `{"error":{"code":402}}`)
 						return
 					}
 					_, _ = io.WriteString(writer, completionJSON("usługa wróciła"))
-				case "/key":
+				case "/v1/key":
 					if keyChecks.Add(1) == 1 {
 						if test.retryAfter != "" {
 							writer.Header().Set("Retry-After", test.retryAfter)
@@ -92,7 +92,7 @@ func TestInFlightBudgetUsesOnlyRetryAfterDenyPeriod(t *testing.T) {
 	var completions atomic.Int32
 	var keyChecks atomic.Int32
 	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
-		if request.URL.Path == "/key" {
+		if request.URL.Path == "/v1/key" {
 			keyChecks.Add(1)
 		}
 		if completions.Add(1) == 1 {
@@ -131,7 +131,7 @@ func TestPositiveKeyLimitKeepsOneRecoveryProbeUnderConcurrency(t *testing.T) {
 	releaseProbe := make(chan struct{})
 	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 		switch request.URL.Path {
-		case "/chat/completions":
+		case "/alpha/decisions":
 			switch completions.Add(1) {
 			case 1:
 				writer.WriteHeader(http.StatusPaymentRequired)
@@ -142,7 +142,7 @@ func TestPositiveKeyLimitKeepsOneRecoveryProbeUnderConcurrency(t *testing.T) {
 				<-releaseProbe
 			}
 			_, _ = io.WriteString(writer, completionJSON("kredyt wrócił"))
-		case "/key":
+		case "/v1/key":
 			keyChecks.Add(1)
 			_, _ = io.WriteString(writer, `{"data":{"limit_remaining":1.25}}`)
 		default:
@@ -209,7 +209,7 @@ func TestNullKeyLimitAllowsOneCompletionProbe(t *testing.T) {
 	probeStarted := make(chan struct{})
 	releaseProbe := make(chan struct{})
 	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
-		if request.URL.Path == "/key" {
+		if request.URL.Path == "/v1/key" {
 			keyChecks.Add(1)
 			_, _ = io.WriteString(writer, `{"data":{"limit_remaining":null}}`)
 			return
@@ -338,8 +338,8 @@ func runNullKeyLimitProbeFailureTest(t *testing.T, probe func() (*http.Response,
 		case 1:
 			return testResponse(http.StatusPaymentRequired, `{"error":{"code":402}}`, ""), nil
 		case 2:
-			if request.URL.Path != "/key" {
-				t.Fatalf("second request path = %q, want /key", request.URL.Path)
+			if request.URL.Path != "/v1/key" {
+				t.Fatalf("second request path = %q, want /v1/key", request.URL.Path)
 			}
 			return testResponse(http.StatusOK, `{"data":{"limit_remaining":null}}`, ""), nil
 		case 3:
@@ -350,7 +350,7 @@ func runNullKeyLimitProbeFailureTest(t *testing.T, probe func() (*http.Response,
 		}
 	})}
 	client, err := New(Config{
-		APIKey: "test-key", Model: ModelGeminiFlashLite, BalanceCooldown: 15 * time.Minute, RequestTimeout: 5 * time.Second,
+		APIKey: "test-key", Model: ModelJev, BalanceCooldown: 15 * time.Minute, RequestTimeout: 5 * time.Second,
 	}, WithBaseURL("https://openrouter.test"), WithHTTPClient(httpClient), WithClock(clock.Now))
 	if err != nil {
 		t.Fatalf("New() error = %v", err)
@@ -385,7 +385,7 @@ func TestNullKeyLimitInFlightProbeKeepsTemporaryRecovery(t *testing.T) {
 	releaseRecovery := make(chan struct{})
 	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 		switch request.URL.Path {
-		case "/chat/completions":
+		case "/alpha/decisions":
 			switch completions.Add(1) {
 			case 1:
 				writer.WriteHeader(http.StatusPaymentRequired)
@@ -397,7 +397,7 @@ func TestNullKeyLimitInFlightProbeKeepsTemporaryRecovery(t *testing.T) {
 			default:
 				_, _ = io.WriteString(writer, completionJSON("próba działa"))
 			}
-		case "/key":
+		case "/v1/key":
 			if keyChecks.Add(1) == 2 {
 				close(recoveryStarted)
 				<-releaseRecovery

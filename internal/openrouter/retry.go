@@ -27,7 +27,7 @@ func parseRetryAfter(value string, now time.Time) (time.Duration, bool) {
 
 func IsAllowedModel(model string) bool {
 	switch model {
-	case ModelGeminiFlashLite:
+	case ModelJev:
 		return true
 	default:
 		return false

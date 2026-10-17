@@ -17,7 +17,7 @@ import (
 const (
 	DefaultBotHandle                 = "Bosun"
 	DefaultPort                      = 8080
-	DefaultOpenRouterModel           = openrouter.ModelGeminiFlashLite
+	DefaultOpenRouterModel           = openrouter.ModelJev
 	DefaultOpenRouterBalanceCooldown = 15 * time.Minute
 	DefaultOpenRouterRequestTimeout  = 5 * time.Second
 )

@@ -111,13 +111,13 @@ Each candidate batch has distinct setup and punchline variants. Consecutive repl
 
 The first sentence fits the message profile. The second sentence adds a separate comic scene instead of the same criticism.
 
-OpenRouter receives the fixed profile and the eight indexed candidate texts. It returns only one integer index.
+OpenRouter receives the fixed profile and eight candidate texts. Jev returns one typed choice, eight probabilities, and a confidence value.
 
 Bosun displays the selected local candidate. It never displays text from the model response.
 
 Bosun records only the committed candidate in the recent reply history. It releases an unused batch without a history record.
 
-Each completion requires `provider.zdr=true`, `provider.data_collection="deny"`, and `provider.require_parameters=true`. Each completion also sends `X-OpenRouter-Cache: false`.
+Each decision requires `provider.zdr=true`, `provider.data_collection="deny"`, and `provider.require_parameters=true`. Each decision also sends `X-OpenRouter-Cache: false`.
 
 Bosun does not retry with weaker privacy controls. A privacy route fault returns the preselected static reply.
 
@@ -129,7 +129,7 @@ Use these optional settings when the defaults do not apply:
 
 | Variable | Default | Purpose |
 | --- | --- | --- |
-| `OPENROUTER_MODEL` | `google/gemini-3.1-flash-lite` | Use the only model that the code permits. |
+| `OPENROUTER_MODEL` | `typesafe/jev-1.14` | Use the only decision model that the code permits. |
 | `OPENROUTER_BALANCE_COOLDOWN` | `15m` | Set the credit circuit cooldown. |
 | `OPENROUTER_REQUEST_TIMEOUT` | `5s` | Set the request deadline. |
 
@@ -228,9 +228,9 @@ Bosun makes no OpenRouter request while this long circuit is open. Readiness sta
 
 After the cooldown, exactly one request checks the normal key limit. Concurrent requests use static replies through the recovery probe.
 
-A positive remaining key limit or an explicit `limit_remaining:null` permits one shared completion probe.
+A positive remaining key limit or an explicit `limit_remaining:null` permits one shared decision probe.
 
-Only a successful completion probe closes the circuit. Any failed probe restarts the long cooldown, except `openrouter_in_flight_budget`.
+Only a successful decision probe closes the circuit. Any failed probe restarts the long cooldown, except `openrouter_in_flight_budget`.
 
 Missing key data, null key data, or a missing limit restarts the long cooldown.
 
@@ -250,7 +250,7 @@ Confirm that the release uses version 0.3 or later before you enable dynamic mod
 
 The automated request test checks the complete JSON body and headers. It uses canary names, identifiers, links, service names, and file names.
 
-The test permits only fixed profile keys, eight vetted candidates, fixed indexes, and the strict choice schema.
+The test permits only fixed profile keys, one typed choice question, and eight vetted candidate criteria.
 
 The test also checks the ZDR, data collection, required parameter, and cache controls.
 
@@ -284,11 +284,11 @@ fly deploy --app "$FLY_APP_NAME" --config fly.toml --image <previous-image-refer
 - [Discord application commands](https://discord.com/developers/docs/interactions/application-commands)
 - [Fly application configuration](https://fly.io/docs/reference/configuration/)
 - [Fly Machine restart policy](https://fly.io/docs/machines/guides-examples/machine-restart-policy/)
-- [OpenRouter chat completions](https://openrouter.ai/docs/api/api-reference/chat/send-chat-completion-request)
+- [OpenRouter Jev 1.14](https://openrouter.ai/typesafe/jev-1.14)
+- [OpenRouter Decisions API guide](https://openrouter.ai/blog/insights/what-is-jev/)
 - [OpenRouter current key](https://openrouter.ai/docs/api/api-reference/api-keys/get-current-key)
 - [OpenRouter privacy policy](https://openrouter.ai/privacy/)
 - [OpenRouter data collection](https://openrouter.ai/docs/guides/privacy/data-collection)
 - [OpenRouter Zero Data Retention](https://openrouter.ai/docs/guides/features/zdr)
 - [OpenRouter provider routing](https://openrouter.ai/docs/guides/routing/provider-selection)
-- [OpenRouter structured outputs](https://openrouter.ai/docs/guides/features/structured-outputs)
 - [OpenRouter response cache](https://openrouter.ai/docs/guides/features/response-caching)

@@ -167,7 +167,7 @@ func TestResolveReplyUsesStaticFallbackForRejectedModelOutput(t *testing.T) {
 	}))
 	defer server.Close()
 	client, err := openrouter.New(openrouter.Config{
-		APIKey: "test-key", Model: openrouter.ModelGeminiFlashLite,
+		APIKey: "test-key", Model: openrouter.ModelJev,
 		BalanceCooldown: time.Minute, RequestTimeout: time.Second,
 	}, openrouter.WithBaseURL(server.URL))
 	if err != nil {

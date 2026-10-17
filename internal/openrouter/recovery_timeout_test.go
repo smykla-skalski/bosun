@@ -21,16 +21,16 @@ func TestRecoveryRequestsReceiveIndependentTimeouts(t *testing.T) {
 		case 1:
 			return testResponse(http.StatusPaymentRequired, `{"error":{"code":402}}`, ""), nil
 		case 2:
-			if request.URL.Path != "/key" {
-				t.Fatalf("second request path = %q, want /key", request.URL.Path)
+			if request.URL.Path != "/v1/key" {
+				t.Fatalf("second request path = %q, want /v1/key", request.URL.Path)
 			}
 			if err := waitForRequest(request, requestDelay); err != nil {
 				return nil, err
 			}
 			return testResponse(http.StatusOK, `{"data":{"limit_remaining":1}}`, ""), nil
 		case 3:
-			if request.URL.Path != "/chat/completions" {
-				t.Fatalf("third request path = %q, want /chat/completions", request.URL.Path)
+			if request.URL.Path != "/alpha/decisions" {
+				t.Fatalf("third request path = %q, want /alpha/decisions", request.URL.Path)
 			}
 			if err := waitForRequest(request, requestDelay); err != nil {
 				return nil, err
@@ -64,8 +64,8 @@ func TestRecoveryKeyCheckHonorsRequestTimeout(t *testing.T) {
 		case 1:
 			return testResponse(http.StatusPaymentRequired, `{"error":{"code":402}}`, ""), nil
 		case 2:
-			if request.URL.Path != "/key" {
-				t.Fatalf("second request path = %q, want /key", request.URL.Path)
+			if request.URL.Path != "/v1/key" {
+				t.Fatalf("second request path = %q, want /v1/key", request.URL.Path)
 			}
 			<-request.Context().Done()
 			return nil, request.Context().Err()
@@ -96,7 +96,7 @@ func newTimeoutTestClient(
 ) *Client {
 	t.Helper()
 	client, err := New(Config{
-		APIKey: "test-key", Model: ModelGeminiFlashLite,
+		APIKey: "test-key", Model: ModelJev,
 		BalanceCooldown: 15 * time.Minute, RequestTimeout: requestTimeout,
 	}, WithBaseURL("https://openrouter.test"), WithHTTPClient(httpClient), WithClock(clock.Now))
 	if err != nil {

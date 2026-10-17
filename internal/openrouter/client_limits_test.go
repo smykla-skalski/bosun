@@ -18,7 +18,7 @@ func TestCompleteRejectsUnsafeCandidatesBeforeNetwork(t *testing.T) {
 		return testResponse(http.StatusOK, completionJSON("unexpected"), ""), nil
 	})}
 	client, err := New(Config{
-		APIKey: "test-key", Model: ModelGeminiFlashLite,
+		APIKey: "test-key", Model: ModelJev,
 		BalanceCooldown: 15 * time.Minute, RequestTimeout: 5 * time.Second,
 	}, WithBaseURL("https://openrouter.test"), WithHTTPClient(httpClient))
 	if err != nil {
@@ -82,7 +82,7 @@ func TestCompleteHonorsRequestTimeout(t *testing.T) {
 		return nil, request.Context().Err()
 	})}
 	client, err := New(Config{
-		APIKey: "test-key", Model: ModelGeminiFlashLite,
+		APIKey: "test-key", Model: ModelJev,
 		BalanceCooldown: 15 * time.Minute, RequestTimeout: 20 * time.Millisecond,
 	}, WithHTTPClient(httpClient))
 	if err != nil {

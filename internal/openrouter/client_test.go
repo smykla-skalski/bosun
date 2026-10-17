@@ -28,13 +28,13 @@ func TestCompleteSendsDecisionContractAndReturnsChoice(t *testing.T) {
 	var requests atomic.Int32
 	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 		requests.Add(1)
-		assertCompletionRequest(t, request, input)
+		assertDecisionRequest(t, request, input)
 		writer.Header().Set("Content-Type", "application/json")
-		_, _ = io.WriteString(writer, `{"choices":[{"message":{"content":"{\"choice\":6}"},"finish_reason":"stop"}]}`)
+		_, _ = io.WriteString(writer, decisionJSON(6))
 	}))
 	defer server.Close()
 
-	client := newTestClient(t, server.URL+"/api/v1", time.Now)
+	client := newTestClient(t, server.URL+"/api", time.Now)
 	choice, err := client.Complete(context.Background(), input)
 	if err != nil {
 		t.Fatalf("Complete() error = %v", err)
@@ -47,9 +47,9 @@ func TestCompleteSendsDecisionContractAndReturnsChoice(t *testing.T) {
 	}
 }
 
-func assertCompletionRequest(t *testing.T, request *http.Request, profile Input) {
+func assertDecisionRequest(t *testing.T, request *http.Request, input Input) {
 	t.Helper()
-	if request.Method != http.MethodPost || request.URL.Path != "/api/v1/chat/completions" {
+	if request.Method != http.MethodPost || request.URL.Path != "/api/alpha/decisions" {
 		t.Errorf("request = %s %s", request.Method, request.URL.Path)
 	}
 	if request.Header.Get("Authorization") != "Bearer test-key" || request.Header.Get("X-OpenRouter-Cache") != "false" {
@@ -76,11 +76,8 @@ func assertCompletionRequest(t *testing.T, request *http.Request, profile Input)
 		t.Errorf("decode request: %v", err)
 		return
 	}
-	assertExactKeys(t, body, "model", "messages", "stream", "max_completion_tokens", "reasoning_effort", "provider", "response_format")
-	assertRequestField(t, body, "model", ModelGeminiFlashLite)
-	assertRequestField(t, body, "stream", false)
-	assertRequestField(t, body, "max_completion_tokens", float64(64))
-	assertRequestField(t, body, "reasoning_effort", "minimal")
+	assertExactKeys(t, body, "model", "state", "questions", "provider")
+	assertRequestField(t, body, "model", ModelJev)
 	var provider map[string]json.RawMessage
 	if err := json.Unmarshal(body["provider"], &provider); err != nil {
 		t.Errorf("decode provider: %v", err)
@@ -90,99 +87,56 @@ func assertCompletionRequest(t *testing.T, request *http.Request, profile Input)
 	assertRequestField(t, provider, "zdr", true)
 	assertRequestField(t, provider, "data_collection", "deny")
 	assertRequestField(t, provider, "require_parameters", true)
-	assertResponseFormat(t, body["response_format"])
-	assertProfileMessage(t, body["messages"], profile)
+	assertDecisionState(t, body["state"], input.Profile)
+	assertDecisionQuestion(t, body["questions"], input.Candidates)
 }
 
-func assertResponseFormat(t *testing.T, raw json.RawMessage) {
+func assertDecisionState(t *testing.T, raw json.RawMessage, want messageprofile.Profile) {
 	t.Helper()
-	var format map[string]json.RawMessage
-	if err := json.Unmarshal(raw, &format); err != nil {
-		t.Fatalf("decode response format: %v", err)
+	var got messageprofile.Profile
+	if err := json.Unmarshal(raw, &got); err != nil {
+		t.Fatalf("decode state: %v", err)
 	}
-	assertExactKeys(t, format, "type", "json_schema")
-	assertRequestField(t, format, "type", "json_schema")
-	var contract map[string]json.RawMessage
-	if err := json.Unmarshal(format["json_schema"], &contract); err != nil {
-		t.Fatalf("decode JSON schema contract: %v", err)
-	}
-	assertExactKeys(t, contract, "name", "strict", "schema")
-	assertRequestField(t, contract, "name", "reply_choice")
-	assertRequestField(t, contract, "strict", true)
-	assertChoiceSchema(t, contract["schema"])
-}
-
-func assertChoiceSchema(t *testing.T, raw json.RawMessage) {
-	t.Helper()
-	var schema map[string]json.RawMessage
-	if err := json.Unmarshal(raw, &schema); err != nil {
-		t.Fatalf("decode choice schema: %v", err)
-	}
-	assertExactKeys(t, schema, "type", "properties", "required", "additionalProperties")
-	assertRequestField(t, schema, "type", "object")
-	assertRequestField(t, schema, "additionalProperties", false)
-	assertRequestField(t, schema, "required", [1]string{"choice"})
-	var properties map[string]json.RawMessage
-	if err := json.Unmarshal(schema["properties"], &properties); err != nil {
-		t.Fatalf("decode choice properties: %v", err)
-	}
-	assertExactKeys(t, properties, "choice")
-	var choice map[string]json.RawMessage
-	if err := json.Unmarshal(properties["choice"], &choice); err != nil {
-		t.Fatalf("decode choice property: %v", err)
-	}
-	assertExactKeys(t, choice, "type", "description", "enum")
-	assertRequestField(t, choice, "type", "integer")
-	assertRequestField(t, choice, "description", "Indeks najlepiej dopasowanej riposty od 0 do 7.")
-	assertRequestField(t, choice, "enum", [CandidateCount]int{0, 1, 2, 3, 4, 5, 6, 7})
-}
-
-func assertProfileMessage(t *testing.T, raw json.RawMessage, profile Input) {
-	t.Helper()
-	var messages []message
-	if err := json.Unmarshal(raw, &messages); err != nil {
-		t.Fatalf("decode messages: %v", err)
-	}
-	if len(messages) != 2 || messages[0].Role != "system" || messages[0].Content != systemPrompt || messages[1].Role != "user" {
-		t.Fatalf("messages = %#v", messages)
-	}
-	var payload decisionPayload
-	if err := json.Unmarshal([]byte(messages[1].Content), &payload); err != nil {
-		t.Fatalf("decode decision payload: %v", err)
-	}
-	if payload.Profile != profile.Profile {
-		t.Errorf("profile input = %#v, want %#v", payload.Profile, profile.Profile)
-	}
-	for index, candidate := range payload.Candidates {
-		if candidate.Index != index || candidate.Text != profile.Candidates[index] {
-			t.Errorf("candidate %d = %#v", index, candidate)
-		}
-		if err := replies.ValidateModelCandidate(candidate.Text); err != nil {
-			t.Errorf("candidate %d is unsafe: %v", index, err)
-		}
+	if got != want {
+		t.Errorf("state = %#v, want %#v", got, want)
 	}
 	var fields map[string]json.RawMessage
-	if err := json.Unmarshal([]byte(messages[1].Content), &fields); err != nil {
-		t.Fatalf("decode payload fields: %v", err)
+	if err := json.Unmarshal(raw, &fields); err != nil {
+		t.Fatalf("decode state fields: %v", err)
 	}
-	assertExactKeys(t, fields, "profile", "candidates")
-	var profileFields map[string]json.RawMessage
-	if err := json.Unmarshal(fields["profile"], &profileFields); err != nil {
-		t.Fatalf("decode profile fields: %v", err)
-	}
-	assertExactKeys(t, profileFields,
+	assertExactKeys(t, fields,
 		"version", "trigger", "category", "form", "structure", "length_bucket",
 		"punctuation", "tone", "humor", "directness", "casing", "profanity_strength", "spice",
 	)
-	var candidates []map[string]json.RawMessage
-	if err := json.Unmarshal(fields["candidates"], &candidates); err != nil {
-		t.Fatalf("decode candidates: %v", err)
+}
+
+func assertDecisionQuestion(t *testing.T, raw json.RawMessage, candidates [CandidateCount]string) {
+	t.Helper()
+	var questions map[string]json.RawMessage
+	if err := json.Unmarshal(raw, &questions); err != nil {
+		t.Fatalf("decode questions: %v", err)
 	}
-	if len(candidates) != CandidateCount {
-		t.Fatalf("candidate count = %d, want %d", len(candidates), CandidateCount)
+	assertExactKeys(t, questions, "reply")
+	var question map[string]json.RawMessage
+	if err := json.Unmarshal(questions["reply"], &question); err != nil {
+		t.Fatalf("decode reply question: %v", err)
 	}
-	for _, candidate := range candidates {
-		assertExactKeys(t, candidate, "index", "text")
+	assertExactKeys(t, question, "type", "instructions", "criteria")
+	assertRequestField(t, question, "type", "choice")
+	assertRequestField(t, question, "instructions", decisionInstructions)
+
+	var criteria map[string]json.RawMessage
+	if err := json.Unmarshal(question["criteria"], &criteria); err != nil {
+		t.Fatalf("decode criteria: %v", err)
+	}
+	if len(criteria) != CandidateCount {
+		t.Fatalf("criteria count = %d, want %d", len(criteria), CandidateCount)
+	}
+	for index, candidate := range candidates {
+		assertRequestField(t, criteria, candidateIDs[index], candidate)
+		if err := replies.ValidateModelCandidate(candidate); err != nil {
+			t.Errorf("candidate %d is unsafe: %v", index, err)
+		}
 	}
 }
 
@@ -196,22 +150,22 @@ func assertNoCanaries(t *testing.T, location string, value string) {
 	}
 }
 
-func TestSystemPromptKeepsSafetyAndDataBoundaries(t *testing.T) {
+func TestDecisionInstructionsKeepSafetyAndDataBoundaries(t *testing.T) {
 	t.Parallel()
 
 	for _, rule := range []string{
-		"Wybierz indeks jednej z ośmiu gotowych odpowiedzi",
-		"wyłącznie do stałych etykiet profilu",
-		"Nie zmieniaj tekstu odpowiedzi",
-		"wymagany obiekt JSON",
+		"anonimowego profilu wiadomości",
+		"Użyj wszystkich cech profilu",
+		"drugie zdanie dodaje nowy obraz komiczny",
+		"Nie preferuj próśb o dodatkowy kontekst",
 	} {
-		if !strings.Contains(systemPrompt, rule) {
-			t.Fatalf("system prompt does not contain rule %q", rule)
+		if !strings.Contains(decisionInstructions, rule) {
+			t.Fatalf("decision instructions do not contain rule %q", rule)
 		}
 	}
 	for _, forbidden := range []string{"discord", "bosun", "configured-server"} {
-		if strings.Contains(strings.ToLower(systemPrompt), forbidden) {
-			t.Fatalf("system prompt contains forbidden term %q", forbidden)
+		if strings.Contains(strings.ToLower(decisionInstructions), forbidden) {
+			t.Fatalf("decision instructions contain forbidden term %q", forbidden)
 		}
 	}
 }
@@ -258,7 +212,7 @@ func TestCompleteRejectsEveryNonDecisionOutput(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
 			server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, _ *http.Request) {
-				_, _ = io.WriteString(writer, decisionResponse(test.content))
+				_, _ = io.WriteString(writer, rawDecisionResponse(test.content))
 			}))
 			defer server.Close()
 			client := newTestClient(t, server.URL, time.Now)
@@ -278,7 +232,7 @@ func TestCompleteAcceptsBoundaryDecisions(t *testing.T) {
 		t.Run(string(rune('0'+choice)), func(t *testing.T) {
 			t.Parallel()
 			server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, _ *http.Request) {
-				_, _ = io.WriteString(writer, decisionResponse(`{"choice":`+string(rune('0'+choice))+`}`))
+				_, _ = io.WriteString(writer, decisionJSON(choice))
 			}))
 			defer server.Close()
 			client := newTestClient(t, server.URL, time.Now)
@@ -294,7 +248,7 @@ func TestCompleteRejectsPartialChoiceWithError(t *testing.T) {
 	t.Parallel()
 
 	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, _ *http.Request) {
-		_, _ = io.WriteString(writer, `{"choices":[{"message":{"content":"częściowa odpowiedź"},"finish_reason":"stop","error":{"code":500}}]}`)
+		_, _ = io.WriteString(writer, `{"answers":{"reply":{"type":"choice","choice":"candidate_1","probabilities":{},"confidence":1}},"error":{"code":500}}`)
 	}))
 	defer server.Close()
 	client := newTestClient(t, server.URL, time.Now)
@@ -304,42 +258,28 @@ func TestCompleteRejectsPartialChoiceWithError(t *testing.T) {
 	}
 }
 
-func TestCompleteAcceptsValidDecisionForAnyFinishReason(t *testing.T) {
+func TestCompleteAcceptsRoundedDecisionProbabilities(t *testing.T) {
 	t.Parallel()
 
-	tests := []struct {
-		name   string
-		reason any
-		omit   bool
-	}{
-		{name: "missing", omit: true},
-		{name: "null", reason: nil},
-		{name: "length", reason: "length"},
-		{name: "error", reason: "error"},
-		{name: "tool", reason: "tool"},
-		{name: "tool calls", reason: "tool_calls"},
-		{name: "other", reason: "content_filter"},
+	probabilities := map[string]float64{
+		"candidate_0": 0.13,
+		"candidate_1": 0.12,
+		"candidate_2": 0.12,
+		"candidate_3": 0.12,
+		"candidate_4": 0.12,
+		"candidate_5": 0.14,
+		"candidate_6": 0.12,
+		"candidate_7": 0.12,
 	}
-	for _, test := range tests {
-		test := test
-		t.Run(test.name, func(t *testing.T) {
-			t.Parallel()
-			choice := map[string]any{"message": map[string]any{"content": `{"choice":5}`}}
-			if !test.omit {
-				choice["finish_reason"] = test.reason
-			}
-			encoded, _ := json.Marshal(map[string]any{"choices": []any{choice}})
-			server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, _ *http.Request) {
-				_, _ = writer.Write(encoded)
-			}))
-			defer server.Close()
-			client := newTestClient(t, server.URL, time.Now)
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, _ *http.Request) {
+		_, _ = io.WriteString(writer, decisionJSONWithProbabilities(5, probabilities, 0.61))
+	}))
+	defer server.Close()
+	client := newTestClient(t, server.URL, time.Now)
 
-			selected, err := client.Complete(context.Background(), validInput())
-			if selected != 5 || err != nil {
-				t.Fatalf("Complete() = %d, %v; want choice 5", selected, err)
-			}
-		})
+	selected, err := client.Complete(context.Background(), validInput())
+	if selected != 5 || err != nil {
+		t.Fatalf("Complete() = %d, %v; want choice 5", selected, err)
 	}
 }
 
@@ -390,7 +330,7 @@ func TestPaymentRequiredWithUnreadableBodyOpensCircuit(t *testing.T) {
 				return &http.Response{StatusCode: http.StatusPaymentRequired, Header: make(http.Header), Body: test.body()}, nil
 			})}
 			client, err := New(Config{
-				APIKey: "test-key", Model: ModelGeminiFlashLite, BalanceCooldown: 15 * time.Minute, RequestTimeout: 5 * time.Second,
+				APIKey: "test-key", Model: ModelJev, BalanceCooldown: 15 * time.Minute, RequestTimeout: 5 * time.Second,
 			}, WithBaseURL("https://openrouter.test"), WithHTTPClient(httpClient))
 			if err != nil {
 				t.Fatalf("New() error = %v", err)
@@ -416,7 +356,7 @@ func TestCompleteRejectsInvalidProfileBeforeNetwork(t *testing.T) {
 		return testResponse(http.StatusOK, completionJSON("unexpected"), ""), nil
 	})}
 	client, err := New(Config{
-		APIKey: "test-key", Model: ModelGeminiFlashLite, BalanceCooldown: 15 * time.Minute, RequestTimeout: 5 * time.Second,
+		APIKey: "test-key", Model: ModelJev, BalanceCooldown: 15 * time.Minute, RequestTimeout: 5 * time.Second,
 	}, WithBaseURL("https://openrouter.test"), WithHTTPClient(httpClient))
 	if err != nil {
 		t.Fatalf("New() error = %v", err)
