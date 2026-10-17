@@ -9,7 +9,7 @@ import (
 	"github.com/smykla-skalski/bosun/internal/messageprofile"
 )
 
-const decisionInstructions = `Wybierz gotową ripostę, która dokładnie odpowiada anonimowemu profilowi wiadomości w polu state. Pole category jest wiążącym typem wiadomości. Pola conversation_role, question_kind i response_mode określają rolę wypowiedzi oraz oczekiwany rodzaj odpowiedzi. Nie traktuj presence, status, opinion, agreement, disagreement, reaction, confusion ani acknowledgement jak zwykłego pytania. Pierwsze zdanie riposty musi bezpośrednio odpowiadać typowi wiadomości. Drugie zdanie może dodać nowy obraz komiczny, lecz musi pozostać związane z tym typem. Odrzuć ripostę, która błędnie nazywa wiadomość pytaniem, prośbą, planem lub argumentem. Preferuj mocną, konkretną i zabawną ripostę. Nie wybieraj prośby o dodatkowy kontekst.`
+const decisionInstructions = `Wybierz gotową ripostę, która dokładnie odpowiada anonimowemu profilowi wiadomości w polu state. Pole category jest wiążącym typem wiadomości. Pola conversation_role, question_kind i response_mode określają rolę wypowiedzi oraz oczekiwany rodzaj odpowiedzi. Nie traktuj presence, status, opinion, agreement, disagreement, reaction, confusion ani acknowledgement jak zwykłego pytania. Każda riposta jest jednym zdaniem bez końcowego znaku interpunkcyjnego. Pierwsza część musi bezpośrednio odpowiadać typowi wiadomości, a puenta musi pasować do tonu, humoru, bezpośredniości, wulgarności i poziomu spice. Odrzuć ripostę, która błędnie nazywa wiadomość pytaniem, prośbą, planem lub argumentem. Preferuj najmocniejszą, najcelniejszą i najzabawniejszą ripostę bez powtórzenia tej samej myśli. Nie wybieraj prośby o dodatkowy kontekst.`
 
 type decisionRequest struct {
 	Model     string                 `json:"model"`

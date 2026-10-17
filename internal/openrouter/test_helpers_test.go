@@ -88,14 +88,14 @@ func validInput() Input {
 		},
 		CandidateType: "question",
 		Candidates: [CandidateCount]string{
-			"Twój pomysł wszedł na pokład bez mapy i kompasu. Spróbuj ponownie, tym razem z choćby szkicem celu.",
-			"Twój pomysł wszedł na pokład bez mapy i kompasu. Dodaj konkret, zanim reszta zdania zacznie panikować.",
-			"Twój pomysł wszedł na pokład bez mapy i kompasu. Nie naprawię kursu, którego nikt nie wyznaczył.",
-			"Twój pomysł wszedł na pokład bez mapy i kompasu. Następna wersja niech zawiera także powód.",
-			"Twój pomysł wszedł na pokład bez mapy i kompasu. Zbierz fakty, zanim znowu wypuścisz ten balon.",
-			"Twój pomysł wszedł na pokład bez mapy i kompasu. Daj temu minutę myślenia i drugi przecinek.",
-			"Twój pomysł wszedł na pokład bez mapy i kompasu. Wróć z pytaniem, które wie, czego chce.",
-			"Twój pomysł wszedł na pokład bez mapy i kompasu. Nawet dobra mina nie zastąpi tu danych.",
+			"Twój pomysł wszedł na pokład bez mapy i kompasu, a rozsądek ogląda rejs z łodzi ratunkowej",
+			"To pytanie ma więcej pewności niż treści, bo znak zapytania robi całą robotę",
+			"Widzę odwagę, lecz sens został w porcie, więc logika wysłała za tobą list gończy",
+			"Ten plan brzmi jak szkic napisany podczas sztormu, a fakty wystąpiły o zakaz zbliżania",
+			"Pytasz śmiało, jakby szczegóły były opcjonalne, choć nawet chaos poprosił o czytelniejszy plan",
+			"To zdanie dopłynęło, ale argument wypadł za burtę, więc odpowiedź musi posprzątać po twojej myśli",
+			"Masz kierunek, tylko każdy drogowskaz wskazuje gdzie indziej, bo przypadek wniósłby więcej precyzji",
+			"Pomysł jest świeży, bo rozsądek jeszcze go nie dotknął, a puenta sama poprosiła o lepszego autora",
 		},
 	}
 }

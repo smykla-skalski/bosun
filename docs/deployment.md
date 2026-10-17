@@ -107,9 +107,9 @@ Bosun does not send member words, names, links, files, identifiers, timestamps, 
 
 Bosun selects eight vetted static replies for each event. Candidate zero is the guaranteed fallback.
 
-Each candidate batch has distinct setup and punchline variants. Consecutive replies do not reuse either variant.
+Each candidate batch has distinct lead and finisher variants. Consecutive replies do not reuse either variant.
 
-The first sentence answers the exact message type. The second sentence adds a different comic beat for that type.
+Each reply is one dash-linked sentence without final punctuation. Its lead answers the exact type, and its finisher adds a related reversal.
 
 OpenRouter receives the fixed profile and eight typed candidate texts. Jev returns one typed choice, eight probabilities, and a confidence value.
 

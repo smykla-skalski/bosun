@@ -1,20 +1,27 @@
 # Bosun persona research
 
-Bosun uses short Polish replies that combine dry irony, maritime language, and clear criticism of the user's current message or effort.
+Bosun uses short Polish replies that combine dry irony, maritime language, and direct criticism of the current message or effort.
 
-The static catalog contains 6,400 original replies. The generator combines original sentence pairs and does not copy jokes from the research sources.
+The static catalog contains 6,400 original replies. The generator combines one contextual lead with one dependent finisher and copies no source text.
 
 ## Research sources
 
-- [Beyond Philology: Polish irony research](https://fil.ug.edu.pl/sites/fil.ug.edu.pl/files/_nodes/strona/33797/files/beyond-philology-21-1.pdf) informed the use of contrast, implied criticism, and context-dependent irony.
-- [Frontiers: humor styles and personality](https://www.frontiersin.org/journals/psychology/articles/10.3389/fpsyg.2021.548450/full) informed the separation between light teasing and aggressive humor.
+- [LingVaria: incongruity and punchlines](https://journals.akademicka.pl/lv/article/view/6023) informed the use of a clear semantic turn near the end.
+- [Prace Językoznawcze: punchline construction](https://czasopisma.uwm.edu.pl/index.php/pj/article/view/12286) informed concision, wordplay, meaning shifts, and sudden perspective changes.
+- [Folia Linguistica: syntax in humorous texts](https://czasopisma.uni.lodz.pl/linguistica/article/view/1332) informed short parallel structures, pauses, and controlled repetition.
+- [Politeja: ironic deprecation](https://journals.akademicka.pl/politeja/article/download/3476/3045/4137) informed indirect negative judgment through apparent praise and contrast.
+- [Culture.pl: Polish humor](https://culture.pl/pl/superartykul/smieje-sie-wiec-jestem-osiem-mistrzyn-polskiego-humoru) informed the balance between aggressive satire, irony, and self-aware distance.
+- [Narodowe Centrum Kultury: sardonic humor](https://nck.pl/projekty-kulturalne/projekty/ojczysty-dodaj-do-ulubionych/ciekawostki-jezykowe/SARDONICZNY_smiech) informed the bitter, ironic, mocking tone.
 - [Discord Community Guidelines](https://discord.com/guidelines) informed the exclusions for threats, private data, sexual abuse, self-harm attacks, and protected-trait attacks.
 
 ## Writing rules
 
 - Write every reply in Polish.
+- Write exactly one dash-linked sentence without final punctuation.
 - Keep each reply self-contained and suitable for a random response.
 - Direct criticism at the message, prompt, effort, logic, plan, or repeated behavior.
+- Put the strongest image, reversal, or punch word near the end.
+- Use category-specific finishers instead of unrelated reaction scenes.
 - Use maritime details to support the Bosun persona.
 - Permit Polish profanity in the harsh and savage tiers.
 - Exclude protected-trait attacks, threats, private data, sexual abuse, and self-harm attacks.
