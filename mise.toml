@@ -1,4 +1,5 @@
 [tools]
+actionlint = "1.7.12"
 go = "1.27.2"
 
 [tasks.deps]
@@ -51,6 +52,10 @@ run = "go run ./tools/replygen"
 description = "Check the Polish reply catalog"
 run = "go run ./tools/replygen -check"
 
+[tasks."workflow:check"]
+description = "Check GitHub Actions workflows"
+run = "actionlint .github/workflows/*.yaml"
+
 [tasks."docker:build"]
 description = "Build the container image"
 run = "docker build --pull --platform linux/amd64 --tag smykland-bosun:local ."
@@ -72,4 +77,4 @@ fly scale count 1 --app "$fly_app_name" --config fly.toml --region fra --yes
 
 [tasks.check]
 description = "Run all local checks"
-depends = ["fmt:check", "replies:check", "lint", "test", "test:race", "build"]
+depends = ["fmt:check", "replies:check", "workflow:check", "lint", "test", "test:race", "build"]

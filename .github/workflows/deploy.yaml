@@ -1,0 +1,103 @@
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-fly-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Test and deploy to Fly
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    environment: production
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Install mise
+        uses: jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c # v4.3.0
+        with:
+          cache: true
+
+      - name: Run checks
+        run: mise run check
+
+      - name: Install flyctl
+        uses: superfly/flyctl-actions/setup-flyctl@ed8efb33836e8b2096c7fd3ba1c8afe303ebbff1 # v1.6
+
+      - name: Verify production secrets
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+        run: |
+          set -euo pipefail
+          secrets="$(flyctl secrets list --app smykland-bosun --json)"
+          for name in DISCORD_APPLICATION_ID DISCORD_TOKEN DISCORD_GUILD_ID OPENROUTER_API_KEY; do
+            if ! jq -e --arg name "$name" 'any(.[]; .name == $name)' <<<"$secrets" >/dev/null; then
+              echo "required Fly secret $name is not deployed" >&2
+              exit 1
+            fi
+          done
+
+      - name: Verify the single bot topology
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+        run: |
+          set -euo pipefail
+          machines="$(flyctl machines list --app smykland-bosun --json)"
+          count="$(jq 'length' <<<"$machines")"
+          if [[ "$count" -gt 1 ]]; then
+            echo "expected at most one bot machine, found $count" >&2
+            exit 1
+          fi
+
+      - name: Deploy
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+        run: |
+          set -euo pipefail
+          flyctl deploy \
+            --app smykland-bosun \
+            --config fly.toml \
+            --ha=false \
+            --no-public-ips \
+            --wait-timeout 300
+          flyctl scale count 1 \
+            --app smykland-bosun \
+            --config fly.toml \
+            --region fra \
+            --yes
+
+      - name: Verify the bot
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+        run: |
+          set -euo pipefail
+          flyctl status --app smykland-bosun
+          machines="$(flyctl machines list --app smykland-bosun --json)"
+          count="$(jq 'length' <<<"$machines")"
+          if [[ "$count" -ne 1 ]]; then
+            echo "deploy left $count bot machines" >&2
+            exit 1
+          fi
+          state="$(jq -r '.[0].state' <<<"$machines")"
+          if [[ "$state" != "started" ]]; then
+            echo "bot machine state is $state, not started" >&2
+            exit 1
+          fi
+          checks="$(jq '.[0].checks // []' <<<"$machines")"
+          total="$(jq 'length' <<<"$checks")"
+          passing="$(jq '[.[] | select(.status == "passing")] | length' <<<"$checks")"
+          if [[ "$total" -eq 0 || "$passing" -ne "$total" ]]; then
+            echo "expected every health check to pass, found $passing of $total" >&2
+            flyctl checks list --app smykland-bosun >&2 || true
+            exit 1
+          fi
