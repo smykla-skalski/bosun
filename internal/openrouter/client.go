@@ -19,6 +19,7 @@ const (
 	defaultBaseURL            = "https://openrouter.ai/api/v1"
 	ModelGeminiFlashLite      = "google/gemini-3.1-flash-lite"
 	CandidateCount            = 8
+	decisionMaxTokens         = 64
 	maximumResponseBytes      = 1 << 20
 	maximumInFlight           = 4
 	defaultRecoveryRetryDelay = 5 * time.Second
@@ -36,7 +37,7 @@ const (
 	FaultTransport       = "transport_error"
 )
 
-const systemPrompt = `Wybierz indeks jednej z ośmiu gotowych odpowiedzi. Dopasuj wybór wyłącznie do stałych etykiet profilu. Nie zmieniaj tekstu odpowiedzi. Zwróć tylko wymagany obiekt JSON.`
+const systemPrompt = `Wybierz indeks jednej z ośmiu gotowych odpowiedzi. Dopasuj wybór wyłącznie do stałych etykiet profilu. Preferuj bezpośrednią, zabawną i mocną ripostę zgodną z typem, tonem i kształtem profilu. Nie preferuj próśb o dodatkowy kontekst. Nie zmieniaj tekstu odpowiedzi. Zwróć tylko wymagany obiekt JSON.`
 
 type Config struct {
 	APIKey          string
@@ -225,7 +226,7 @@ func (c *Client) complete(ctx context.Context, input Input, generation uint64) (
 			{Role: "user", Content: string(payloadData)},
 		},
 		Stream:              false,
-		MaxCompletionTokens: 16,
+		MaxCompletionTokens: decisionMaxTokens,
 		ReasoningEffort:     "minimal",
 		Provider: providerPreferences{
 			ZDR:               true,
@@ -240,8 +241,9 @@ func (c *Client) complete(ctx context.Context, input Input, generation uint64) (
 				Schema: choiceSchema{
 					Type: "object",
 					Properties: choiceProperties{Choice: integerChoice{
-						Type: "integer",
-						Enum: [CandidateCount]int{0, 1, 2, 3, 4, 5, 6, 7},
+						Type:        "integer",
+						Description: "Indeks najlepiej dopasowanej riposty od 0 do 7.",
+						Enum:        [CandidateCount]int{0, 1, 2, 3, 4, 5, 6, 7},
 					}},
 					Required:             []string{"choice"},
 					AdditionalProperties: false,
@@ -287,9 +289,6 @@ func (c *Client) complete(ctx context.Context, input Input, generation uint64) (
 		}
 		c.applyFaultDeny(apiErr, response.Header.Get("Retry-After"), generation)
 		return 0, apiErr
-	}
-	if choice.FinishReason != "stop" {
-		return 0, newFault(FaultInvalidOutput)
 	}
 	return parseDecision(choice.Message.Content)
 }

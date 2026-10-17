@@ -48,8 +48,9 @@ type choiceProperties struct {
 }
 
 type integerChoice struct {
-	Type string              `json:"type"`
-	Enum [CandidateCount]int `json:"enum"`
+	Type        string              `json:"type"`
+	Description string              `json:"description"`
+	Enum        [CandidateCount]int `json:"enum"`
 }
 
 type decisionPayload struct {

@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"strings"
 	"testing"
 )
 
@@ -46,5 +47,38 @@ func TestGenerateContracts(t *testing.T) {
 		if got := tierCounts[tier]; got != want {
 			t.Errorf("tier %d count = %d, want %d", tier, got, want)
 		}
+	}
+}
+
+func TestPunchlinesDoNotRequestMoreContext(t *testing.T) {
+	t.Parallel()
+
+	forbidden := []string{
+		"dodaj ",
+		"dopisz ",
+		"określ ",
+		"podaj ",
+		"pokaż ",
+		"przynieś ",
+		"wyjaśnij ",
+		"wróć z ",
+	}
+	check := func(group string, punchlines []string) {
+		t.Helper()
+		for _, punchline := range punchlines {
+			lower := strings.ToLower(punchline)
+			for _, phrase := range forbidden {
+				if strings.Contains(lower, phrase) {
+					t.Errorf("%s punchline %q requests more context", group, punchline)
+				}
+			}
+		}
+	}
+
+	for _, set := range sets {
+		check(set.name, set.closings)
+	}
+	for _, set := range typedSets {
+		check(set.category, set.closings)
 	}
 }
