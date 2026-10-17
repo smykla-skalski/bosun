@@ -90,7 +90,7 @@ func newStaleTemporaryClient(
 	})
 	clock := newTestClock(time.Unix(1_000, 0))
 	client, err := New(Config{
-		APIKey: "test-key", Model: ModelGeminiFlashLite,
+		APIKey: "test-key", Model: ModelJev,
 		BalanceCooldown: time.Second, RequestTimeout: 5 * time.Second,
 	}, WithBaseURL(server.URL), WithClock(clock.Now))
 	if err != nil {

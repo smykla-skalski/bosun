@@ -68,7 +68,7 @@ func newTestClient(t testHelper, baseURL string, now func() time.Time) *Client {
 	t.Helper()
 	client, err := New(Config{
 		APIKey:          "test-key",
-		Model:           ModelGeminiFlashLite,
+		Model:           ModelJev,
 		BalanceCooldown: 15 * time.Minute,
 		RequestTimeout:  5 * time.Second,
 	}, WithBaseURL(baseURL), WithClock(now))
@@ -112,14 +112,31 @@ func assertExactKeys(t *testing.T, fields map[string]json.RawMessage, keys ...st
 
 func completionJSON(content string) string {
 	_ = content
-	return decisionResponse(`{"choice":1}`)
+	return decisionJSON(1)
 }
 
-func decisionResponse(content string) string {
+func rawDecisionResponse(content string) string {
+	return `{"answers":{"reply":` + content + `}}`
+}
+
+func decisionJSON(choice int) string {
+	probabilities := make(map[string]float64, CandidateCount)
+	for _, candidateID := range candidateIDs {
+		probabilities[candidateID] = 0
+	}
+	probabilities[candidateIDs[choice]] = 1
+	return decisionJSONWithProbabilities(choice, probabilities, 1)
+}
+
+func decisionJSONWithProbabilities(choice int, probabilities map[string]float64, confidence float64) string {
 	encoded, _ := json.Marshal(map[string]any{
-		"choices": []any{map[string]any{
-			"message": map[string]any{"content": content}, "finish_reason": "stop",
-		}},
+		"model": ModelJev,
+		"answers": map[string]any{
+			"reply": map[string]any{
+				"type": "choice", "choice": candidateIDs[choice],
+				"probabilities": probabilities, "confidence": confidence,
+			},
+		},
 	})
 	return string(encoded)
 }

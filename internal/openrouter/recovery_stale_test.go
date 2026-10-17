@@ -41,12 +41,12 @@ func newStaleRecoveryServer() *staleRecoveryServer {
 }
 
 func (s *staleRecoveryServer) ServeHTTP(writer http.ResponseWriter, request *http.Request) {
-	if request.URL.Path == "/key" {
+	if request.URL.Path == "/v1/key" {
 		s.keyChecks.Add(1)
 		_, _ = io.WriteString(writer, `{"data":{"limit_remaining":1}}`)
 		return
 	}
-	if request.URL.Path != "/chat/completions" {
+	if request.URL.Path != "/alpha/decisions" {
 		writer.WriteHeader(http.StatusNotFound)
 		return
 	}
@@ -127,7 +127,7 @@ func TestStaleCreditFaultBeforeRecoverySuccessPreservesOwner(t *testing.T) {
 	})
 	clock := newTestClock(time.Unix(1_000, 0))
 	client, err := New(Config{
-		APIKey: "test-key", Model: ModelGeminiFlashLite,
+		APIKey: "test-key", Model: ModelJev,
 		BalanceCooldown: time.Second, RequestTimeout: 5 * time.Second,
 	}, WithBaseURL(server.URL), WithClock(clock.Now))
 	if err != nil {
@@ -180,7 +180,7 @@ func TestStaleCreditFaultAfterRecoverySuccessDoesNotReopenCircuit(t *testing.T) 
 	})
 	clock := newTestClock(time.Unix(1_000, 0))
 	client, err := New(Config{
-		APIKey: "test-key", Model: ModelGeminiFlashLite,
+		APIKey: "test-key", Model: ModelJev,
 		BalanceCooldown: time.Second, RequestTimeout: 5 * time.Second,
 	}, WithBaseURL(server.URL), WithClock(clock.Now))
 	if err != nil {
