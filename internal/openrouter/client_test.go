@@ -79,7 +79,7 @@ func assertCompletionRequest(t *testing.T, request *http.Request, profile Input)
 	assertExactKeys(t, body, "model", "messages", "stream", "max_completion_tokens", "reasoning_effort", "provider", "response_format")
 	assertRequestField(t, body, "model", ModelGeminiFlashLite)
 	assertRequestField(t, body, "stream", false)
-	assertRequestField(t, body, "max_completion_tokens", float64(16))
+	assertRequestField(t, body, "max_completion_tokens", float64(64))
 	assertRequestField(t, body, "reasoning_effort", "minimal")
 	var provider map[string]json.RawMessage
 	if err := json.Unmarshal(body["provider"], &provider); err != nil {
@@ -131,8 +131,9 @@ func assertChoiceSchema(t *testing.T, raw json.RawMessage) {
 	if err := json.Unmarshal(properties["choice"], &choice); err != nil {
 		t.Fatalf("decode choice property: %v", err)
 	}
-	assertExactKeys(t, choice, "type", "enum")
+	assertExactKeys(t, choice, "type", "description", "enum")
 	assertRequestField(t, choice, "type", "integer")
+	assertRequestField(t, choice, "description", "Indeks najlepiej dopasowanej riposty od 0 do 7.")
 	assertRequestField(t, choice, "enum", [CandidateCount]int{0, 1, 2, 3, 4, 5, 6, 7})
 }
 
@@ -303,7 +304,7 @@ func TestCompleteRejectsPartialChoiceWithError(t *testing.T) {
 	}
 }
 
-func TestCompleteRequiresStopFinishReason(t *testing.T) {
+func TestCompleteAcceptsValidDecisionForAnyFinishReason(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
@@ -323,7 +324,7 @@ func TestCompleteRequiresStopFinishReason(t *testing.T) {
 		test := test
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
-			choice := map[string]any{"message": map[string]any{"content": "niepełna odpowiedź"}}
+			choice := map[string]any{"message": map[string]any{"content": `{"choice":5}`}}
 			if !test.omit {
 				choice["finish_reason"] = test.reason
 			}
@@ -335,8 +336,8 @@ func TestCompleteRequiresStopFinishReason(t *testing.T) {
 			client := newTestClient(t, server.URL, time.Now)
 
 			selected, err := client.Complete(context.Background(), validInput())
-			if selected != 0 || SafeFaultClass(err) != FaultInvalidOutput {
-				t.Fatalf("Complete() = %d, %q; want invalid output", selected, SafeFaultClass(err))
+			if selected != 5 || err != nil {
+				t.Fatalf("Complete() = %d, %v; want choice 5", selected, err)
 			}
 		})
 	}
