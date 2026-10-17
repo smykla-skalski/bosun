@@ -97,11 +97,11 @@ The `always` restart policy keeps the Discord gateway process active.
 
 ## Select the reply mode
 
-Leave `OPENROUTER_API_KEY` unset to use only the 4,000 static replies.
+Leave `OPENROUTER_API_KEY` unset to use only the 6,400 static replies.
 
 Set `OPENROUTER_API_KEY` to enable dynamic replies. Raw member text stays inside the Bosun process.
 
-Bosun creates a local profile from fixed labels. The labels describe form, structure, tone, punctuation, length, humor, directness, casing, profanity, and spice.
+Bosun creates a local profile from fixed labels. The labels describe the conversation role, question kind, response mode, form, structure, tone, and spice.
 
 Bosun does not send member words, names, links, files, identifiers, timestamps, references, exact counts, or stable hashes.
 
@@ -109,9 +109,9 @@ Bosun selects eight vetted static replies for each event. Candidate zero is the 
 
 Each candidate batch has distinct setup and punchline variants. Consecutive replies do not reuse either variant.
 
-The first sentence fits the message profile. The second sentence adds a separate comic scene instead of the same criticism.
+The first sentence answers the exact message type. The second sentence adds a different comic beat for that type.
 
-OpenRouter receives the fixed profile and eight candidate texts. Jev returns one typed choice, eight probabilities, and a confidence value.
+OpenRouter receives the fixed profile and eight typed candidate texts. Jev returns one typed choice, eight probabilities, and a confidence value.
 
 Bosun displays the selected local candidate. It never displays text from the model response.
 

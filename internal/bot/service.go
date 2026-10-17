@@ -186,7 +186,7 @@ func (s *Service) handleMessage(guildID *snowflake.ID, channelID snowflake.ID, m
 		return
 	}
 	accepted := s.messages.Submit(func(ctx context.Context) {
-		category := replies.Classify(messageprofile.Clean(message.Content, s.botHandle))
+		category := replies.ClassifyForTrigger(messageprofile.Clean(message.Content, s.botHandle), string(trigger))
 		batch, err := s.selector.SelectBatch(message.Author.ID.String(), category)
 		if err != nil {
 			s.logFault(replies.Selection{}, staticResult("", "selection"))
@@ -230,7 +230,7 @@ func (s *Service) handleApplicationCommand(event *events.ApplicationCommandInter
 		return
 	}
 
-	category := replies.Classify(messageprofile.Clean(question, s.botHandle))
+	category := replies.ClassifyForTrigger(messageprofile.Clean(question, s.botHandle), string(TriggerAsk))
 	ackCtx, cancel := context.WithTimeout(s.interactions.Context(), interactionAckTimeout)
 	err := event.DeferCreateMessage(false, rest.WithCtx(ackCtx))
 	cancel()

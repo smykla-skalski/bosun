@@ -2,7 +2,7 @@
 
 Bosun is a private Discord bot for the `smykland` server.
 
-Version 0.3 first classifies each message inside the process. It then selects one of 4,000 Polish static replies by category.
+Version 0.3 first classifies each message inside the process. It then selects one of 6,400 Polish static replies by category.
 
 Bosun starts with the `harsh` spice level. It selects `savage` after the third trigger in ten minutes.
 
@@ -70,7 +70,9 @@ Use these optional variables when the defaults do not apply:
 
 Dynamic mode never sends raw or modified member text to OpenRouter. Raw member text stays inside the Bosun process.
 
-Bosun sends fixed profile labels and eight vetted static reply candidates. Each candidate has a fixed `candidate_0` through `candidate_7` identifier.
+Bosun sends fixed profile labels and eight vetted static reply candidates. The labels include the conversation role, question kind, and response mode.
+
+Each candidate has a fixed `candidate_0` through `candidate_7` identifier and the exact anonymous reply type.
 
 Jev returns one typed choice, all option probabilities, and a confidence value. Bosun displays the selected local candidate and never displays model text.
 
@@ -78,7 +80,7 @@ Bosun reserves each candidate batch. It adds only the committed reply to the rec
 
 Each candidate batch has eight distinct setup variants and eight distinct punchline variants.
 
-Each reply uses two sentence roles. The first sentence fits the message, and the second adds a separate comic scene.
+Each reply uses two sentence roles. The first sentence answers the message type, and the second adds a related comic scene.
 
 The OpenRouter request requires Zero Data Retention, denies data collection, and requires Decisions API parameters. It also disables the response cache.
 
@@ -150,7 +152,7 @@ List all tasks with `mise tasks ls`.
 | Task | Result |
 | --- | --- |
 | `mise run check` | Run the format, catalog, lint, test, race, and build checks. |
-| `mise run replies:generate` | Create the 4,000 reply catalog. |
+| `mise run replies:generate` | Create the 6,400 reply catalog. |
 | `mise run workflow:check` | Check the GitHub Actions workflow. |
 | `mise run docker:build` | Build `smykland-bosun:local`. |
 | `mise run fly:validate` | Validate `fly.toml` with strict checks. |

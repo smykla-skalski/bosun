@@ -29,6 +29,14 @@ func TestClassify(t *testing.T) {
 		{name: "thanks", text: "Dzięki za pomoc.", want: CategoryThanks},
 		{name: "challenge", text: "Spróbuj mnie pokonać.", want: CategoryChallenge},
 		{name: "ability challenge", text: "Dasz radę?", want: CategoryChallenge},
+		{name: "presence", text: "Żyjesz?", want: CategoryPresence},
+		{name: "status", text: "Co tam?", want: CategoryStatus},
+		{name: "opinion", text: "Co myślisz?", want: CategoryOpinion},
+		{name: "opinion confirmation", text: "Prawda?", want: CategoryOpinion},
+		{name: "agreement", text: "Dokładnie.", want: CategoryAgreement},
+		{name: "disagreement", text: "Nie.", want: CategoryDisagreement},
+		{name: "confusion", text: "Co?", want: CategoryConfusion},
+		{name: "acknowledgement", text: "Okej.", want: CategoryAcknowledgement},
 		{name: "uppercase", text: "DZIĘKUJĘ!", want: CategoryThanks},
 		{name: "question over greeting", text: "Hej, gdzie jest raport?", want: CategoryQuestion},
 		{name: "request over question", text: "Czy możesz pokazać raport?", want: CategoryRequest},
@@ -46,12 +54,42 @@ func TestClassify(t *testing.T) {
 	}
 }
 
+func TestClassifyForTriggerTreatsShortContinuationAsReaction(t *testing.T) {
+	t.Parallel()
+
+	for _, trigger := range []string{"mention", "reply", "handle", "ask"} {
+		if got := ClassifyForTrigger("ambitnie", trigger); got != CategoryReaction {
+			t.Fatalf("ClassifyForTrigger() = %q, want %q", got, CategoryReaction)
+		}
+	}
+	if got := Classify("ambitnie"); got != CategoryReaction {
+		t.Fatalf("Classify() = %q, want %q", got, CategoryReaction)
+	}
+}
+
 func TestClassifyIgnoresExternalAndStructuredText(t *testing.T) {
 	t.Parallel()
 
-	text := "<@123> <@&456> <:idiota:789> https://example.com/debil www.example.com/problem DISCORD.COM/INVITE/idiota `kretyn` ```awaria``` 12345 $%^"
+	text := "<@123> <@&456> <:żyjesz:789> https://example.com/myslisz www.example.com/problem DISCORD.COM/INVITE/zyjesz `co tam` ```nie rozumiem``` 12345 $%^"
 	if got := Classify(text); got != CategoryGeneric {
 		t.Fatalf("Classify() = %q, want %q", got, CategoryGeneric)
+	}
+}
+
+func TestClassifyDoesNotJoinConversationPhrasesAcrossExcludedText(t *testing.T) {
+	t.Parallel()
+
+	for _, test := range []struct {
+		text string
+		want Category
+	}{
+		{text: "co https://example.com tam", want: CategoryQuestion},
+		{text: "jak `ukryte` leci", want: CategoryQuestion},
+		{text: "ma <:ukryte:123> sens", want: CategoryGeneric},
+	} {
+		if got := Classify(test.text); got != test.want {
+			t.Fatalf("Classify(%q) = %q, want %q", test.text, got, test.want)
+		}
 	}
 }
 

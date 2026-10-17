@@ -155,7 +155,8 @@ func classifyHumor(text string, category string) string {
 
 func classifyDirectness(_ string, category string) string {
 	switch category {
-	case "question", "request", "insult", "challenge", "praise", "thanks", "greeting":
+	case "question", "request", "insult", "challenge", "praise", "thanks", "greeting",
+		"presence", "status", "opinion", "agreement", "disagreement", "reaction", "confusion", "acknowledgement":
 		return "direct"
 	default:
 		return "indirect"

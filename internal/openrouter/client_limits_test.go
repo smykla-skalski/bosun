@@ -24,9 +24,10 @@ func TestCompleteRejectsUnsafeCandidatesBeforeNetwork(t *testing.T) {
 	if err != nil {
 		t.Fatalf("New() error = %v", err)
 	}
-	inputs := []Input{validInput(), validInput()}
+	inputs := []Input{validInput(), validInput(), validInput()}
 	inputs[0].Candidates[2] = "Sprawdź https://private.example/path."
 	inputs[1].Candidates[2] = inputs[1].Candidates[1]
+	inputs[2].CandidateType = "reaction"
 	for _, input := range inputs {
 		if _, err := client.Complete(context.Background(), input); SafeFaultClass(err) != FaultInvalidInput {
 			t.Fatalf("Complete() fault = %q, want invalid input", SafeFaultClass(err))

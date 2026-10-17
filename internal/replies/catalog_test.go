@@ -15,13 +15,13 @@ func TestEmbeddedCatalogCounts(t *testing.T) {
 		t.Fatalf("LoadEmbedded() error = %v", err)
 	}
 
-	if got := catalog.Len(); got != 4000 {
-		t.Fatalf("Len() = %d, want 4000", got)
+	if got := catalog.Len(); got != 6400 {
+		t.Fatalf("Len() = %d, want 6400", got)
 	}
 	wants := map[Tier]int{
-		TierSharp:  1340,
-		TierHarsh:  1330,
-		TierSavage: 1330,
+		TierSharp:  2140,
+		TierHarsh:  2130,
+		TierSavage: 2130,
 	}
 	for tier, want := range wants {
 		if got := catalog.Count(tier); got != want {

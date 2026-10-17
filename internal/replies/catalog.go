@@ -191,13 +191,13 @@ func validateReply(reply Reply) error {
 }
 
 func validateEmbeddedCounts(catalog Catalog) error {
-	if catalog.Len() != 4000 {
-		return fmt.Errorf("reply count is %d, want 4000", catalog.Len())
+	if catalog.Len() != 6400 {
+		return fmt.Errorf("reply count is %d, want 6400", catalog.Len())
 	}
 	expected := map[Tier]int{
-		TierSharp:  1340,
-		TierHarsh:  1330,
-		TierSavage: 1330,
+		TierSharp:  2140,
+		TierHarsh:  2130,
+		TierSavage: 2130,
 	}
 	for tier, count := range expected {
 		if actual := catalog.Count(tier); actual != count {

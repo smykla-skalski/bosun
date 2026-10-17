@@ -11,4 +11,12 @@ var typedSets = []typedTemplateSet{
 	praiseTemplates,
 	thanksTemplates,
 	challengeTemplates,
+	presenceTemplates,
+	statusTemplates,
+	opinionTemplates,
+	agreementTemplates,
+	disagreementTemplates,
+	reactionTemplates,
+	confusionTemplates,
+	acknowledgementTemplates,
 }

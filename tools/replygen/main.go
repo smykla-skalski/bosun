@@ -199,9 +199,10 @@ func main() {
 }
 
 func generate() ([]reply, error) {
-	result := make([]reply, 0, 4000)
-	seenIDs := make(map[string]struct{}, 4000)
-	seenTexts := make(map[string]struct{}, 4000)
+	expectedCount := 1000 + len(typedSets)*300
+	result := make([]reply, 0, expectedCount)
+	seenIDs := make(map[string]struct{}, expectedCount)
+	seenTexts := make(map[string]struct{}, expectedCount)
 
 	for _, set := range sets {
 		sequence := 0
@@ -254,8 +255,8 @@ func generate() ([]reply, error) {
 		}
 	}
 
-	if len(result) != 4000 {
-		return nil, fmt.Errorf("generated %d replies, want 4000", len(result))
+	if len(result) != expectedCount {
+		return nil, fmt.Errorf("generated %d replies, want %d", len(result), expectedCount)
 	}
 	for _, set := range typedSets {
 		for tier := 1; tier <= 3; tier++ {
