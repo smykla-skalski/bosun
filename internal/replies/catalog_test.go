@@ -48,6 +48,9 @@ func TestEmbeddedCatalogHasUniqueIDsAndText(t *testing.T) {
 	ids := make(map[string]struct{}, catalog.Len())
 	texts := make(map[string]struct{}, catalog.Len())
 	for _, entry := range catalog.entries {
+		if entry.OpeningVariant == 0 || entry.PunchlineVariant == 0 {
+			t.Errorf("reply %q has missing composition variants", entry.ID)
+		}
 		if _, exists := ids[entry.ID]; exists {
 			t.Errorf("duplicate ID %q", entry.ID)
 		}

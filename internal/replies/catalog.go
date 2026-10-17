@@ -22,11 +22,13 @@ const (
 )
 
 type Reply struct {
-	ID       string   `json:"id"`
-	Locale   string   `json:"locale"`
-	Category Category `json:"category"`
-	Tier     Tier     `json:"tier"`
-	Text     string   `json:"text"`
+	ID               string   `json:"id"`
+	Locale           string   `json:"locale"`
+	Category         Category `json:"category"`
+	Tier             Tier     `json:"tier"`
+	OpeningVariant   uint8    `json:"opening_variant"`
+	PunchlineVariant uint8    `json:"punchline_variant"`
+	Text             string   `json:"text"`
 }
 
 type Catalog struct {

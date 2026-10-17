@@ -64,7 +64,15 @@ type userState struct {
 	recent         [recentCapacity]string
 	recentStart    int
 	recentCount    int
+	lastReply      replyPattern
 	accessSequence uint64
+}
+
+type replyPattern struct {
+	category  Category
+	tier      Tier
+	opening   uint8
+	punchline uint8
 }
 
 type SelectorOption func(*Selector)
@@ -135,7 +143,7 @@ func (s *Selector) Select(userID string, category Category) (Selection, error) {
 	if err != nil {
 		return Selection{}, err
 	}
-	state.remember(reply.ID)
+	state.remember(reply)
 
 	return Selection{Reply: reply, Tier: tier, TriggerCount: triggerCount}, nil
 }
@@ -206,7 +214,7 @@ func (s *Selector) CommitBatch(batch Batch, choice int) (Selection, error) {
 	reserved := s.reservations[reservationIndex]
 	s.releaseReservation(reservationIndex, reserved)
 	state := s.users[reserved.userID]
-	state.remember(reserved.selections[choice].Reply.ID)
+	state.remember(reserved.selections[choice].Reply)
 	return reserved.selections[choice], nil
 }
 
@@ -264,7 +272,7 @@ func (s *Selector) releaseReservation(index int, reserved reservation) {
 func (s *Selector) pickBatch(candidates []Reply, state *userState, userID string, selected []Selection) (Reply, error) {
 	eligible := 0
 	for _, candidate := range candidates {
-		if state.wasRecent(candidate.ID) || s.isReserved(userID, candidate.ID) || batchContains(selected, candidate.ID) {
+		if state.wasRecent(candidate.ID) || state.matchesLast(candidate) || s.isReserved(userID, candidate.ID) || batchContains(selected, candidate) {
 			continue
 		}
 		eligible++
@@ -278,7 +286,7 @@ func (s *Selector) pickBatch(candidates []Reply, state *userState, userID string
 		return Reply{}, fmt.Errorf("reply index %d is outside [0,%d)", target, eligible)
 	}
 	for _, candidate := range candidates {
-		if state.wasRecent(candidate.ID) || s.isReserved(userID, candidate.ID) || batchContains(selected, candidate.ID) {
+		if state.wasRecent(candidate.ID) || state.matchesLast(candidate) || s.isReserved(userID, candidate.ID) || batchContains(selected, candidate) {
 			continue
 		}
 		if target == 0 {
@@ -289,9 +297,9 @@ func (s *Selector) pickBatch(candidates []Reply, state *userState, userID string
 	return Reply{}, errors.New("reply batch selection exhausted candidates")
 }
 
-func batchContains(selected []Selection, id string) bool {
+func batchContains(selected []Selection, candidate Reply) bool {
 	for _, selection := range selected {
-		if selection.Reply.ID == id {
+		if selection.Reply.ID == candidate.ID || patternsOverlap(selection.Reply, candidate) {
 			return true
 		}
 	}
@@ -319,7 +327,7 @@ func (s *Selector) evictLeastRecentlySeen() {
 func (s *Selector) pick(candidates []Reply, state *userState, userID string) (Reply, error) {
 	eligible := 0
 	for _, candidate := range candidates {
-		if !state.wasRecent(candidate.ID) && !s.isReserved(userID, candidate.ID) {
+		if !state.wasRecent(candidate.ID) && !state.matchesLast(candidate) && !s.isReserved(userID, candidate.ID) {
 			eligible++
 		}
 	}
@@ -332,7 +340,7 @@ func (s *Selector) pick(candidates []Reply, state *userState, userID string) (Re
 		return Reply{}, fmt.Errorf("reply index %d is outside [0,%d)", target, eligible)
 	}
 	for _, candidate := range candidates {
-		if state.wasRecent(candidate.ID) || s.isReserved(userID, candidate.ID) {
+		if state.wasRecent(candidate.ID) || state.matchesLast(candidate) || s.isReserved(userID, candidate.ID) {
 			continue
 		}
 		if target == 0 {
@@ -381,15 +389,39 @@ func (s *userState) wasRecent(id string) bool {
 	return false
 }
 
-func (s *userState) remember(id string) {
+func (s *userState) remember(reply Reply) {
+	id := reply.ID
 	if s.recentCount < recentCapacity {
 		index := (s.recentStart + s.recentCount) % recentCapacity
 		s.recent[index] = id
 		s.recentCount++
+		s.lastReply = patternFor(reply)
 		return
 	}
 	s.recent[s.recentStart] = id
 	s.recentStart = (s.recentStart + 1) % recentCapacity
+	s.lastReply = patternFor(reply)
+}
+
+func (s *userState) matchesLast(reply Reply) bool {
+	last := s.lastReply
+	return last.opening != 0 && last.punchline != 0 && last.category == reply.Category && last.tier == reply.Tier &&
+		(last.opening == reply.OpeningVariant || last.punchline == reply.PunchlineVariant)
+}
+
+func patternsOverlap(left Reply, right Reply) bool {
+	return left.OpeningVariant != 0 && left.PunchlineVariant != 0 &&
+		left.Category == right.Category && left.Tier == right.Tier &&
+		(left.OpeningVariant == right.OpeningVariant || left.PunchlineVariant == right.PunchlineVariant)
+}
+
+func patternFor(reply Reply) replyPattern {
+	return replyPattern{
+		category:  reply.Category,
+		tier:      reply.Tier,
+		opening:   reply.OpeningVariant,
+		punchline: reply.PunchlineVariant,
+	}
 }
 
 func tierForCount(count int) Tier {

@@ -12,24 +12,26 @@ import (
 var check = flag.Bool("check", false, "verify that the checked-in catalog is current")
 
 type templateSet struct {
-	name     string
-	tier     int
-	openings []string
-	closings []string
+	name       string
+	tier       int
+	openings   []string
+	punchlines []string
 }
 
 type typedTemplateSet struct {
-	category string
-	openings [3][]string
-	closings []string
+	category   string
+	openings   [3][]string
+	punchlines []string
 }
 
 type reply struct {
-	ID       string `json:"id"`
-	Locale   string `json:"locale"`
-	Category string `json:"category"`
-	Tier     int    `json:"tier"`
-	Text     string `json:"text"`
+	ID               string `json:"id"`
+	Locale           string `json:"locale"`
+	Category         string `json:"category"`
+	Tier             int    `json:"tier"`
+	OpeningVariant   int    `json:"opening_variant"`
+	PunchlineVariant int    `json:"punchline_variant"`
+	Text             string `json:"text"`
 }
 
 var sets = []templateSet{
@@ -58,24 +60,24 @@ var sets = []templateSet{
 			"Widzę plan, który bardzo starannie omija rozwiązanie.",
 			"Twoja teza jest szybka, lekka i całkiem bez bagażu dowodów.",
 		},
-		closings: []string{
-			"Twój geniusz właśnie zgubił mapę we własnej kieszeni.",
-			"Ta myśl ma stabilność krzesła z trzema złamanymi nogami.",
-			"Nawet echo wstydzi się powtarzać taki numer.",
-			"Twoja logika ma dziś urlop bez terminu powrotu.",
-			"Ten intelektualny ponton tonie jeszcze na parkingu.",
-			"Masz pewność admirała i zasięg gumowej kaczki.",
-			"Rozsądek zobaczył ten występ i wyszedł bocznymi drzwiami.",
-			"Ta wypowiedź ma wdzięk mokrego rachunku z baru.",
-			"Twój kompas moralny wskazuje dziś wyłącznie własny pępek.",
-			"Nawet przypadek zrobiłby z tego lepszy numer.",
-			"Twoja myśl odbiła się od dna i nadal kopie w dół.",
-			"Ten pokaz kompetencji trwał krótko, bo nie miał obsady.",
-			"Masz talent do pewności bez najmniejszego pokrycia.",
-			"Ten pomysł wygląda jak paragon po kąpieli w toalecie.",
-			"Twój rozsądek znowu przegrał wyścig z palcem na klawiaturze.",
-			"Cała ta duma stoi na fundamencie z mokrego papieru.",
-			"To był imponujący skok z przeciętności prosto w żenadę.",
+		punchlines: []string{
+			"Publiczność właśnie spojrzała na zegarek z desperacją.",
+			"Mewa za oknem pokręciła głową i odleciała bez słowa.",
+			"Automat z kawą odmówił komentarza i zatrzasnął podajnik.",
+			"W pobliskiej bibliotece jedna książka sama spadła ze wstydu.",
+			"Pokładowy szczur poprosił o przeniesienie na inny statek.",
+			"Nawet kurz na półce udaje, że tego nie słyszał.",
+			"Jeden ziemniak w kuchni poczuł nagły przypływ wyższości.",
+			"Kalendarz skreślił tę minutę, żeby chronić własną reputację.",
+			"Lustro w korytarzu właśnie odwróciło się do ściany.",
+			"Krzesło pod tobą rozważa zmianę właściciela.",
+			"Winda pojechała na inne piętro bez naciskania przycisku.",
+			"Światło przygasło, jakby pomieszczenie chciało zniknąć.",
+			"Radio samo przełączyło stację na szum ostrzegawczy.",
+			"Sąsiedni kosz zamknął klapę i zachował resztki godności.",
+			"Jedna mucha przerwała lot, żeby okazać politowanie.",
+			"Dywan zwija się powoli i szuka wyjścia.",
+			"Nawet cisza zrobiła krok wstecz i założyła kask.",
 		},
 	},
 	{
@@ -98,29 +100,29 @@ var sets = []templateSet{
 			"Twoje założenia urządziły bunt przeciwko rzeczywistości.",
 			"Nawet przypadek wykonałby tu dokładniejszą robotę.",
 		},
-		closings: []string{
-			"Twoja kompetencja ma dziś formę plotki bez świadków.",
-			"Ten numer pachnie fuszerką i tanią pewnością siebie.",
-			"Nawet mokry karton ma przy tobie kręgosłup.",
-			"Twój mózg odpalił tryb oszczędny i zgubił przycisk powrotu.",
-			"Ta błyskotliwość świeci jak latarka bez baterii.",
-			"Masz rozmach burzy i użyteczność dziurawego wiadra.",
-			"Twoja logika leży pijana pod stołem i woła o taksówkę.",
-			"Ten występ miał klasę śmiecia przyklejonego do buta.",
-			"Twoje ego zajmuje apartament, a talent śpi na wycieraczce.",
-			"Ta myśl wygląda jak wypadek przy pracy bez samej pracy.",
-			"Twoja pewność siebie właśnie pobiła rekord bezpodstawnego hałasu.",
-			"Ten syf ma więcej warstw niż twoja osobowość.",
-			"Nawet błąd ortograficzny wniósłby tu więcej wartości.",
-			"Twój plan ma precyzję pijanego kreta z młotkiem.",
-			"Cała ta poza nie zakrywa pieprzonej pustki pod spodem.",
-			"Twoje argumenty zdechły, lecz ego nadal urządza im paradę.",
-			"Ten pomysł powinien dostać mandat za marnowanie tlenu.",
-			"Masz dar zamiany prostych spraw w publiczną kompromitację.",
-			"Twój rozsądek znów przyszedł ostatni i bez spodni.",
-			"Ta wypowiedź to intelektualny kebab znaleziony pod siedzeniem.",
-			"Nawet twoje wymówki brzmią na zmęczone twoją osobą.",
-			"Ten pokaz był tak pusty, że echo zażądało zwrotu pieniędzy.",
+		punchlines: []string{
+			"Publiczność zamówiła taksówkę, zanim skończyło się pierwsze echo.",
+			"Mewa wyrzuciła frytkę, bo straciła apetyt do tego widowiska.",
+			"Automat biletowy wyświetlił litość zamiast ceny.",
+			"W sąsiednim pokoju roślina zwiędła z drugiej ręki.",
+			"Pokładowy szczur spakował ser i złożył wymówienie.",
+			"Nawet rynsztok uznał ten poziom za przesadę.",
+			"Karton przy śmietniku wyprostował się z poczucia wyższości.",
+			"Kalendarz ogłosił ten dzień świętem cudzej cierpliwości.",
+			"Lustro pękło, choć nikt go nawet nie dotknął.",
+			"Krzesło skrzypi po cichu, jakby szykowało pozew do producenta.",
+			"Winda zamknęła drzwi i odmówiła powrotu na to piętro.",
+			"Żarówka mruga alfabetem Morse'a po pomoc.",
+			"Radio nadało komunikat o lokalnej katastrofie estetycznej.",
+			"Kosz na śmieci odsunął się, żeby uniknąć porównania.",
+			"Mucha na suficie udaje martwą z czystego zażenowania.",
+			"Dywan próbuje zwinąć także ciebie, lecz ma swoje standardy.",
+			"Cisza właśnie złożyła wypowiedzenie bez okresu ochronnego.",
+			"Zegar cofnął wskazówki, bo nie chce firmować tej minuty.",
+			"Gaśnica sama spadła ze ściany na widok tego pożaru godności.",
+			"Sufit rozważa zawalenie jako rozsądną drogę ucieczki.",
+			"Podłoga obniżyła się o centymetr pod ciężarem żenady.",
+			"Drzwi awaryjne otworzyły się same i zaprosiły wszystkich oprócz ciebie.",
 		},
 	},
 	{
@@ -143,29 +145,29 @@ var sets = []templateSet{
 			"Twoja metoda polega na powtarzaniu błędu z większą pewnością.",
 			"Nawet awaria ma więcej struktury niż ten cholerny wywód.",
 		},
-		closings: []string{
-			"Twój mózg właśnie zrobił salto do szamba i zgubił drogę powrotną.",
-			"Ta pieprzona kompromitacja ma już własny kod pocztowy.",
-			"Nawet twoje ego powinno się wstydzić tak marnego właściciela.",
-			"Ten intelektualny ściek płynie pewnie, bo dno zna cię osobiście.",
-			"Masz finezję cegły i subtelność koparki w salonie.",
-			"Twoja logika zdechła tak dawno, że archeolodzy stracili zainteresowanie.",
-			"Ta wypowiedź jest gównem w galowym mundurze i z orderem z kapsla.",
-			"Twój talent do porażki wygląda podejrzanie profesjonalnie.",
-			"Nawet katastrofa naturalna ma przy tobie lepszą organizację.",
-			"Twoje ego ma rozmiar lotniskowca i wyporność zużytej prezerwatywy.",
-			"Ten pomysł powinien zostać zakopany razem z twoją opinią o sobie.",
-			"Masz charyzmę pleśni i skuteczność zepsutej spłuczki.",
-			"Ta kupa słów właśnie obraziła zarówno kupę, jak i słowa.",
-			"Twój rozsądek uciekł z domu i zmienił nazwisko ze wstydu.",
-			"Nawet pustka patrzy na ciebie i czuje zawodową zazdrość.",
-			"Ten cyrk potrzebuje klauna, lecz niestety już jesteś na miejscu.",
-			"Twoja kompetencja jest mitem rozpowszechnianym wyłącznie przez ciebie.",
-			"Ta porażka ma twoją twarz i wyjątkowo dobrze leży.",
-			"Masz intelektualną głębię kałuży po jednym kichnięciu.",
-			"Nawet przypadkowe uderzenie czołem w klawiaturę miałoby lepszą puentę.",
-			"Ten wrak twojej myśli powinien płacić podatek od brzydoty.",
-			"Cały ten hałas to pieprzona zasłona dla kompletnej pustki.",
+		punchlines: []string{
+			"Publiczność uciekła tak szybko, że zostały po niej płonące podeszwy.",
+			"Mewa nasrała obok, żeby zaznaczyć wyższy poziom wypowiedzi.",
+			"Automat z kawą wypluł monetę i nazwał ją odszkodowaniem.",
+			"Roślina w sąsiednim pokoju zdechła, a doniczka prosi o azyl.",
+			"Pokładowe szczury zatopiły statek, żeby skrócić to przedstawienie.",
+			"Rynsztok właśnie pozwał cię za bezczelne podszywanie się pod jego markę.",
+			"Karton spod śmietnika dostał erekcji od nagłego poczucia przewagi.",
+			"Kalendarz wyrwał tę kartkę i spalił ją bez ceremonii.",
+			"Lustro rozbiło się samo, żeby nigdy więcej tego nie odbijać.",
+			"Krzesło woli trafić do pieca niż dalej wspierać ten cyrk.",
+			"Winda przecięła kabel, bo piwnica nadal była zbyt wysoko.",
+			"Żarówka eksplodowała z czystej, pieprzonej odmowy uczestnictwa.",
+			"Radio nadało sygnał alarmowy i przeszło na emeryturę.",
+			"Śmietnik zatrzasnął klapę, bo nie przyjmuje odpadów tej klasy.",
+			"Mucha zdechła w locie, żeby nie spędzić tu kolejnej sekundy.",
+			"Dywan próbuje wpełznąć pod własny spód i zniknąć.",
+			"Cisza zwymiotowała, chociaż nie ma nawet żołądka.",
+			"Zegar popełnił awarię, żeby ta chwila nie miała świadków.",
+			"Gaśnica uznała ten pożar godności za niegodny piany.",
+			"Sufit pękł ze śmiechu, lecz szybko przeszedł w żałobę.",
+			"Podłoga otworzyła szczelinę, ale piekło odmówiło odbioru.",
+			"Drzwi awaryjne wystrzeliły z zawiasów i zabrały ze sobą klamkę.",
 		},
 	},
 }
@@ -203,16 +205,18 @@ func generate() ([]reply, error) {
 
 	for _, set := range sets {
 		sequence := 0
-		for _, opening := range set.openings {
-			for _, closing := range set.closings {
+		for openingIndex, opening := range set.openings {
+			for punchlineIndex, punchline := range set.punchlines {
 				sequence++
-				text := opening + " " + closing
+				text := opening + " " + punchline
 				entry := reply{
-					ID:       fmt.Sprintf("%s-%03d", set.name, sequence),
-					Locale:   "pl",
-					Category: "generic",
-					Tier:     set.tier,
-					Text:     text,
+					ID:               fmt.Sprintf("%s-%03d", set.name, sequence),
+					Locale:           "pl",
+					Category:         "generic",
+					Tier:             set.tier,
+					OpeningVariant:   openingIndex + 1,
+					PunchlineVariant: punchlineIndex + 1,
+					Text:             text,
 				}
 				if err := appendUnique(&result, seenIDs, seenTexts, entry); err != nil {
 					return nil, err
@@ -225,19 +229,21 @@ func generate() ([]reply, error) {
 	for _, set := range typedSets {
 		for tierIndex, openings := range set.openings {
 			tier := tierIndex + 1
-			if len(openings) != 10 || len(set.closings) != 10 {
-				return nil, fmt.Errorf("category %s tier %d has %d openings and %d closings, want 10 each", set.category, tier, len(openings), len(set.closings))
+			if len(openings) != 10 || len(set.punchlines) != 10 {
+				return nil, fmt.Errorf("category %s tier %d has %d openings and %d punchlines, want 10 each", set.category, tier, len(openings), len(set.punchlines))
 			}
 			sequence := 0
-			for _, opening := range openings {
-				for _, closing := range set.closings {
+			for openingIndex, opening := range openings {
+				for punchlineIndex, punchline := range set.punchlines {
 					sequence++
 					entry := reply{
-						ID:       fmt.Sprintf("%s-%d-%03d", set.category, tier, sequence),
-						Locale:   "pl",
-						Category: set.category,
-						Tier:     tier,
-						Text:     opening + " " + closing,
+						ID:               fmt.Sprintf("%s-%d-%03d", set.category, tier, sequence),
+						Locale:           "pl",
+						Category:         set.category,
+						Tier:             tier,
+						OpeningVariant:   openingIndex + 1,
+						PunchlineVariant: punchlineIndex + 1,
+						Text:             opening + " " + punchline,
 					}
 					if err := appendUnique(&result, seenIDs, seenTexts, entry); err != nil {
 						return nil, err
