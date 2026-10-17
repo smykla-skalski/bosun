@@ -9,19 +9,27 @@ import (
 type Category string
 
 const (
-	CategoryGeneric   Category = "generic"
-	CategoryGreeting  Category = "greeting"
-	CategoryQuestion  Category = "question"
-	CategoryRequest   Category = "request"
-	CategoryComplaint Category = "complaint"
-	CategoryBoast     Category = "boast"
-	CategoryInsult    Category = "insult"
-	CategoryJoke      Category = "joke"
-	CategoryPraise    Category = "praise"
-	CategoryThanks    Category = "thanks"
-	CategoryChallenge Category = "challenge"
+	CategoryGeneric         Category = "generic"
+	CategoryGreeting        Category = "greeting"
+	CategoryQuestion        Category = "question"
+	CategoryRequest         Category = "request"
+	CategoryComplaint       Category = "complaint"
+	CategoryBoast           Category = "boast"
+	CategoryInsult          Category = "insult"
+	CategoryJoke            Category = "joke"
+	CategoryPraise          Category = "praise"
+	CategoryThanks          Category = "thanks"
+	CategoryChallenge       Category = "challenge"
+	CategoryPresence        Category = "presence"
+	CategoryStatus          Category = "status"
+	CategoryOpinion         Category = "opinion"
+	CategoryAgreement       Category = "agreement"
+	CategoryDisagreement    Category = "disagreement"
+	CategoryReaction        Category = "reaction"
+	CategoryConfusion       Category = "confusion"
+	CategoryAcknowledgement Category = "acknowledgement"
 
-	categoryCount = 11
+	categoryCount = 19
 )
 
 var categories = [...]Category{
@@ -36,6 +44,14 @@ var categories = [...]Category{
 	CategoryPraise,
 	CategoryThanks,
 	CategoryChallenge,
+	CategoryPresence,
+	CategoryStatus,
+	CategoryOpinion,
+	CategoryAgreement,
+	CategoryDisagreement,
+	CategoryReaction,
+	CategoryConfusion,
+	CategoryAcknowledgement,
 }
 
 type categorySignals uint16
@@ -54,6 +70,15 @@ const (
 )
 
 func Classify(text string) Category {
+	return ClassifyForTrigger(text, "")
+}
+
+func ClassifyForTrigger(text string, trigger string) Category {
+	conversation, wordCount := classifyConversation(text)
+	if conversation != CategoryGeneric {
+		return conversation
+	}
+
 	signals := scanSignals(text)
 	for _, match := range [...]struct {
 		signal   categorySignals
@@ -73,6 +98,9 @@ func Classify(text string) Category {
 		if signals&match.signal != 0 {
 			return match.category
 		}
+	}
+	if continuationTrigger(trigger) && shortReaction(text, wordCount) {
+		return CategoryReaction
 	}
 	return CategoryGeneric
 }
@@ -369,6 +397,22 @@ func categoryIndex(category Category) int {
 		return 9
 	case CategoryChallenge:
 		return 10
+	case CategoryPresence:
+		return 11
+	case CategoryStatus:
+		return 12
+	case CategoryOpinion:
+		return 13
+	case CategoryAgreement:
+		return 14
+	case CategoryDisagreement:
+		return 15
+	case CategoryReaction:
+		return 16
+	case CategoryConfusion:
+		return 17
+	case CategoryAcknowledgement:
+		return 18
 	default:
 		return -1
 	}

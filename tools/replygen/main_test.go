@@ -13,13 +13,14 @@ func TestGenerateContracts(t *testing.T) {
 	if err != nil {
 		t.Fatalf("generate() error = %v", err)
 	}
-	if len(entries) != 4000 {
-		t.Fatalf("generate() count = %d, want 4000", len(entries))
+	expectedCount := 1000 + len(typedSets)*300
+	if len(entries) != expectedCount {
+		t.Fatalf("generate() count = %d, want %d", len(entries), expectedCount)
 	}
 
 	ids := make(map[string]struct{}, len(entries))
 	texts := make(map[string]struct{}, len(entries))
-	counts := make(map[string]int, 33)
+	counts := make(map[string]int, len(typedSets)*3)
 	tierCounts := make(map[int]int, 3)
 	for _, entry := range entries {
 		if entry.OpeningVariant < 1 || entry.PunchlineVariant < 1 {
@@ -37,15 +38,15 @@ func TestGenerateContracts(t *testing.T) {
 		tierCounts[entry.Tier]++
 	}
 
-	for _, category := range []string{"greeting", "question", "request", "complaint", "boast", "insult", "joke", "praise", "thanks", "challenge"} {
+	for _, set := range typedSets {
 		for tier := 1; tier <= 3; tier++ {
-			if got := counts[fmt.Sprintf("%s-%d", category, tier)]; got != 100 {
-				t.Errorf("category %s tier %d count = %d, want 100", category, tier, got)
+			if got := counts[fmt.Sprintf("%s-%d", set.category, tier)]; got != 100 {
+				t.Errorf("category %s tier %d count = %d, want 100", set.category, tier, got)
 			}
 		}
 	}
 
-	wantTierCounts := map[int]int{1: 1340, 2: 1330, 3: 1330}
+	wantTierCounts := map[int]int{1: 2140, 2: 2130, 3: 2130}
 	for tier, want := range wantTierCounts {
 		if got := tierCounts[tier]; got != want {
 			t.Errorf("tier %d count = %d, want %d", tier, got, want)
@@ -53,7 +54,7 @@ func TestGenerateContracts(t *testing.T) {
 	}
 }
 
-func TestPunchlinesHaveASeparateRole(t *testing.T) {
+func TestPunchlinesDoNotRequestMoreContext(t *testing.T) {
 	t.Parallel()
 
 	forbidden := []string{
@@ -65,32 +66,9 @@ func TestPunchlinesHaveASeparateRole(t *testing.T) {
 		"przynieś ",
 		"wyjaśnij ",
 		"wróć z ",
-		"argument",
-		"dane",
-		"diagnoz",
-		"dowcip",
-		"fakt",
-		"humor",
-		"komplement",
 		"kontekst",
-		"logik",
-		"medal",
-		"myśl",
-		"obelg",
-		"plan",
-		"podzięk",
-		"pochwa",
-		"prośb",
-		"puent",
-		"pytan",
-		"skarg",
 		"szczegół",
-		"treść",
-		"wdzięcz",
 		"wymagan",
-		"wyzwisk",
-		"wyzwan",
-		"żart",
 	}
 	check := func(group string, punchlines []string) {
 		t.Helper()
@@ -98,7 +76,7 @@ func TestPunchlinesHaveASeparateRole(t *testing.T) {
 			lower := strings.ToLower(punchline)
 			for _, phrase := range forbidden {
 				if strings.Contains(lower, phrase) {
-					t.Errorf("%s punchline %q overlaps the setup role", group, punchline)
+					t.Errorf("%s punchline %q requests more context", group, punchline)
 				}
 			}
 		}

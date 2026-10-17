@@ -51,6 +51,9 @@ func TestResolveReplyUsesAnonymousMessageProfile(t *testing.T) {
 	if captured.Profile.Trigger != "mention" || captured.Profile.Category != "request" || captured.Profile.Spice != "harsh" {
 		t.Fatalf("model profile = %#v", captured)
 	}
+	if captured.CandidateType != "request" || captured.Profile.ResponseMode != "task_roast" {
+		t.Fatalf("model reply type = %#v", captured)
+	}
 	for index, candidate := range captured.Candidates {
 		if candidate != selections[index].Reply.Text {
 			t.Fatalf("candidate %d = %q", index, candidate)

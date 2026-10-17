@@ -36,7 +36,7 @@ func (s *Service) resolveReply(
 	if err != nil {
 		return staticResult(fallback.Reply.Text, openrouter.FaultInvalidInput)
 	}
-	input := openrouter.Input{Profile: profile}
+	input := openrouter.Input{Profile: profile, CandidateType: string(category)}
 	for index, selection := range selections {
 		if err := replies.ValidateModelCandidate(selection.Reply.Text, s.botHandle); err != nil {
 			return staticResult(fallback.Reply.Text, openrouter.FaultInvalidInput)

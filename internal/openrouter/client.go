@@ -46,8 +46,9 @@ type Config struct {
 }
 
 type Input struct {
-	Profile    messageprofile.Profile
-	Candidates [CandidateCount]string
+	Profile       messageprofile.Profile
+	CandidateType string
+	Candidates    [CandidateCount]string
 }
 
 type Client struct {
@@ -246,7 +247,7 @@ func (c *Client) complete(ctx context.Context, input Input, generation uint64) (
 }
 
 func validateInput(input Input) bool {
-	if input.Profile.Validate() != nil {
+	if input.Profile.Validate() != nil || input.CandidateType == "" || input.CandidateType != input.Profile.Category {
 		return false
 	}
 	seen := make(map[string]struct{}, CandidateCount)
