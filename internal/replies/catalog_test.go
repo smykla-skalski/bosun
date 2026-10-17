@@ -91,7 +91,7 @@ func TestNewCatalogRequiresBatchCapacity(t *testing.T) {
 				Locale:   "pl",
 				Category: "generic",
 				Tier:     tier,
-				Text:     fmt.Sprintf("Unikalna odpowiedź %d-%02d.", tier, index),
+				Text:     fmt.Sprintf("Unikalna odpowiedź %d-%02d", tier, index),
 			})
 		}
 	}
@@ -120,7 +120,7 @@ func TestNewCatalogRejectsUnknownCategory(t *testing.T) {
 				Locale:   "pl",
 				Category: category,
 				Tier:     tier,
-				Text:     fmt.Sprintf("Inna odpowiedź %d-%02d.", tier, index),
+				Text:     fmt.Sprintf("Inna odpowiedź %d-%02d", tier, index),
 			})
 		}
 	}
@@ -142,7 +142,7 @@ func TestNewCatalogRequiresEveryTierForPresentCategory(t *testing.T) {
 				Locale:   "pl",
 				Category: CategoryGeneric,
 				Tier:     tier,
-				Text:     fmt.Sprintf("Ogólna odpowiedź %d-%02d.", tier, index),
+				Text:     fmt.Sprintf("Ogólna odpowiedź %d-%02d", tier, index),
 			})
 		}
 	}
@@ -152,7 +152,7 @@ func TestNewCatalogRequiresEveryTierForPresentCategory(t *testing.T) {
 			Locale:   "pl",
 			Category: CategoryGreeting,
 			Tier:     TierSharp,
-			Text:     fmt.Sprintf("Powitanie numer %02d.", index),
+			Text:     fmt.Sprintf("Powitanie numer %02d", index),
 		})
 	}
 
@@ -224,6 +224,29 @@ func TestNewCatalogRejectsUnsafeModelCandidate(t *testing.T) {
 	}
 }
 
+func TestNewCatalogRequiresOneSentenceWithoutTerminalPunctuation(t *testing.T) {
+	t.Parallel()
+
+	for _, text := range []string{
+		"Pierwsze zdanie. Drugie zdanie",
+		"Jedno zdanie.",
+		"Pytanie?",
+		"Krzyk!",
+		"Wielokropek…",
+	} {
+		_, err := NewCatalog([]Reply{{
+			ID:       "invalid-sentence",
+			Locale:   "pl",
+			Category: CategoryGeneric,
+			Tier:     TierSharp,
+			Text:     text,
+		}})
+		if err == nil || !strings.Contains(err.Error(), "one sentence without terminal punctuation") {
+			t.Fatalf("NewCatalog(%q) error = %v, want sentence contract error", text, err)
+		}
+	}
+}
+
 func minimalCatalogEntries(repliesPerTier int) []Reply {
 	entries := make([]Reply, 0, repliesPerTier*3)
 	for tier := TierSharp; tier <= TierSavage; tier++ {
@@ -233,7 +256,7 @@ func minimalCatalogEntries(repliesPerTier int) []Reply {
 				Locale:   "pl",
 				Category: CategoryGeneric,
 				Tier:     tier,
-				Text:     fmt.Sprintf("Minimalna odpowiedź %d-%02d.", tier, index),
+				Text:     fmt.Sprintf("Minimalna odpowiedź %d-%02d", tier, index),
 			})
 		}
 	}

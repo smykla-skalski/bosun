@@ -158,7 +158,9 @@ func TestDecisionInstructionsKeepSafetyAndDataBoundaries(t *testing.T) {
 		"anonimowemu profilowi wiadomości",
 		"Pole category jest wiążącym typem wiadomości",
 		"conversation_role, question_kind i response_mode",
-		"Pierwsze zdanie riposty musi bezpośrednio odpowiadać typowi wiadomości",
+		"Każda riposta jest jednym zdaniem bez końcowego znaku interpunkcyjnego",
+		"Pierwsza część musi bezpośrednio odpowiadać typowi wiadomości",
+		"bez powtórzenia tej samej myśli",
 		"Nie wybieraj prośby o dodatkowy kontekst",
 	} {
 		if !strings.Contains(decisionInstructions, rule) {

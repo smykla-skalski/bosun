@@ -341,7 +341,7 @@ func minimalBatchSelector(t *testing.T) *Selector {
 				Locale:   "pl",
 				Category: CategoryGeneric,
 				Tier:     tier,
-				Text:     fmt.Sprintf("Bezpieczna odpowiedź %d %02d.", tier, index),
+				Text:     fmt.Sprintf("Bezpieczna odpowiedź %d %02d", tier, index),
 			})
 		}
 	}

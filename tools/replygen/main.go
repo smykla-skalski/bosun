@@ -7,6 +7,9 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
+	"unicode"
+	"unicode/utf8"
 )
 
 var check = flag.Bool("check", false, "verify that the checked-in catalog is current")
@@ -61,23 +64,23 @@ var sets = []templateSet{
 			"Twoja teza jest szybka, lekka i całkiem bez bagażu dowodów.",
 		},
 		punchlines: []string{
-			"Publiczność właśnie spojrzała na zegarek z desperacją.",
-			"Mewa za oknem pokręciła głową i odleciała bez słowa.",
-			"Automat z kawą odmówił komentarza i zatrzasnął podajnik.",
-			"W pobliskiej bibliotece jedna książka sama spadła ze wstydu.",
-			"Pokładowy szczur poprosił o przeniesienie na inny statek.",
-			"Nawet kurz na półce udaje, że tego nie słyszał.",
-			"Jeden ziemniak w kuchni poczuł nagły przypływ wyższości.",
-			"Kalendarz skreślił tę minutę, żeby chronić własną reputację.",
-			"Lustro w korytarzu właśnie odwróciło się do ściany.",
-			"Krzesło pod tobą rozważa zmianę właściciela.",
-			"Winda pojechała na inne piętro bez naciskania przycisku.",
-			"Światło przygasło, jakby pomieszczenie chciało zniknąć.",
-			"Radio samo przełączyło stację na szum ostrzegawczy.",
-			"Sąsiedni kosz zamknął klapę i zachował resztki godności.",
-			"Jedna mucha przerwała lot, żeby okazać politowanie.",
-			"Dywan zwija się powoli i szuka wyjścia.",
-			"Nawet cisza zrobiła krok wstecz i założyła kask.",
+			"A latarnia zgasiła światło, żeby nie wskazywać tego kursu.",
+			"Bo biblioteka przeniosła tę chwilę do działu fantastyki.",
+			"Więc automat z kawą wyświetlił komunikat o litości.",
+			"A kalendarz skreślił tę minutę dla własnej reputacji.",
+			"Choć lustro odwróciło się do ściany bez jednego słowa.",
+			"Aż winda wybrała inne piętro bez naciskania przycisku.",
+			"A gaśnica spadła ze ściany czysto profilaktycznie.",
+			"Bo krzesło rozważa zmianę właściciela.",
+			"Więc radio przełączyło się na szum ostrzegawczy.",
+			"Jakby mewa za oknem właśnie straciła apetyt.",
+			"A dywan powoli zwijał się w stronę wyjścia.",
+			"Choć drzwi awaryjne otworzyły się z czystej uprzejmości.",
+			"Aż żarówka zamrugała alfabetem Morse'a po pomoc.",
+			"A sufit zaczął sprawdzać warunki polisy.",
+			"Bo cisza cofnęła się i założyła kask.",
+			"Więc zegar cofnął wskazówki dla ochrony świadków.",
+			"A pokładowy szczur poprosił o transfer na ląd.",
 		},
 	},
 	{
@@ -101,28 +104,28 @@ var sets = []templateSet{
 			"Nawet przypadek wykonałby tu dokładniejszą robotę.",
 		},
 		punchlines: []string{
-			"Publiczność zamówiła taksówkę, zanim skończyło się pierwsze echo.",
-			"Mewa wyrzuciła frytkę, bo straciła apetyt do tego widowiska.",
-			"Automat biletowy wyświetlił litość zamiast ceny.",
-			"W sąsiednim pokoju roślina zwiędła z drugiej ręki.",
-			"Pokładowy szczur spakował ser i złożył wymówienie.",
-			"Nawet rynsztok uznał ten poziom za przesadę.",
-			"Karton przy śmietniku wyprostował się z poczucia wyższości.",
-			"Kalendarz ogłosił ten dzień świętem cudzej cierpliwości.",
-			"Lustro pękło, choć nikt go nawet nie dotknął.",
-			"Krzesło skrzypi po cichu, jakby szykowało pozew do producenta.",
-			"Winda zamknęła drzwi i odmówiła powrotu na to piętro.",
-			"Żarówka mruga alfabetem Morse'a po pomoc.",
-			"Radio nadało komunikat o lokalnej katastrofie estetycznej.",
-			"Kosz na śmieci odsunął się, żeby uniknąć porównania.",
-			"Mucha na suficie udaje martwą z czystego zażenowania.",
-			"Dywan próbuje zwinąć także ciebie, lecz ma swoje standardy.",
-			"Cisza właśnie złożyła wypowiedzenie bez okresu ochronnego.",
-			"Zegar cofnął wskazówki, bo nie chce firmować tej minuty.",
-			"Gaśnica sama spadła ze ściany na widok tego pożaru godności.",
-			"Sufit rozważa zawalenie jako rozsądną drogę ucieczki.",
-			"Podłoga obniżyła się o centymetr pod ciężarem żenady.",
-			"Drzwi awaryjne otworzyły się same i zaprosiły wszystkich oprócz ciebie.",
+			"A publiczność zamówiła taksówkę przed pierwszym echem.",
+			"Bo mewa wyrzuciła frytkę po jednym spojrzeniu.",
+			"Więc automat biletowy wyświetlił litość zamiast ceny.",
+			"A roślina w sąsiednim pokoju zwiędła z drugiej ręki.",
+			"Choć pokładowy szczur spakował ser i złożył wymówienie.",
+			"Aż rynsztok zażądał uczciwszego porównania.",
+			"A karton przy śmietniku wyprostował się z wyższością.",
+			"Bo kalendarz ogłosił święto cudzej cierpliwości.",
+			"Więc lustro pękło bez żadnego kontaktu fizycznego.",
+			"Jakby krzesło szykowało pozew do producenta.",
+			"A winda zamknęła drzwi i odmówiła zjazdu.",
+			"Choć żarówka mrugała alfabetem Morse'a po pomoc.",
+			"Aż radio nadało komunikat o katastrofie estetycznej.",
+			"A kosz odsunął się, żeby uniknąć porównania.",
+			"Bo mucha na suficie udawała martwą z zażenowania.",
+			"Więc dywan próbował cię zwinąć, lecz ma standardy.",
+			"A cisza złożyła wypowiedzenie bez okresu ochronnego.",
+			"Choć zegar cofnął wskazówki, by nie firmować tej minuty.",
+			"Aż gaśnica spadła ze ściany na widok tej sceny.",
+			"A sufit rozważał zawalenie jako rozsądną ucieczkę.",
+			"Bo podłoga obniżyła się pod ciężarem żenady.",
+			"Więc drzwi awaryjne zaprosiły wszystkich oprócz ciebie.",
 		},
 	},
 	{
@@ -146,28 +149,28 @@ var sets = []templateSet{
 			"Nawet awaria ma więcej struktury niż ten cholerny wywód.",
 		},
 		punchlines: []string{
-			"Publiczność uciekła tak szybko, że zostały po niej płonące podeszwy.",
-			"Mewa nasrała obok, żeby zaznaczyć wyższy poziom wypowiedzi.",
-			"Automat z kawą wypluł monetę i nazwał ją odszkodowaniem.",
-			"Roślina w sąsiednim pokoju zdechła, a doniczka prosi o azyl.",
-			"Pokładowe szczury zatopiły statek, żeby skrócić to przedstawienie.",
-			"Rynsztok właśnie pozwał cię za bezczelne podszywanie się pod jego markę.",
-			"Karton spod śmietnika dostał erekcji od nagłego poczucia przewagi.",
-			"Kalendarz wyrwał tę kartkę i spalił ją bez ceremonii.",
-			"Lustro rozbiło się samo, żeby nigdy więcej tego nie odbijać.",
-			"Krzesło woli trafić do pieca niż dalej wspierać ten cyrk.",
-			"Winda przecięła kabel, bo piwnica nadal była zbyt wysoko.",
-			"Żarówka eksplodowała z czystej, pieprzonej odmowy uczestnictwa.",
-			"Radio nadało sygnał alarmowy i przeszło na emeryturę.",
-			"Śmietnik zatrzasnął klapę, bo nie przyjmuje odpadów tej klasy.",
-			"Mucha zdechła w locie, żeby nie spędzić tu kolejnej sekundy.",
-			"Dywan próbuje wpełznąć pod własny spód i zniknąć.",
-			"Cisza zwymiotowała, chociaż nie ma nawet żołądka.",
-			"Zegar popełnił awarię, żeby ta chwila nie miała świadków.",
-			"Gaśnica uznała ten pożar godności za niegodny piany.",
-			"Sufit pękł ze śmiechu, lecz szybko przeszedł w żałobę.",
-			"Podłoga otworzyła szczelinę, ale piekło odmówiło odbioru.",
-			"Drzwi awaryjne wystrzeliły z zawiasów i zabrały ze sobą klamkę.",
+			"A publiczność spierdalała tak szybko, że płonęły podeszwy.",
+			"Bo mewa nasrała obok i podniosła poziom występu.",
+			"Więc automat z kawą wypluł monetę jako odszkodowanie.",
+			"A roślina zdechła, a doniczka natychmiast poprosiła o azyl.",
+			"Choć pokładowe szczury zatopiły statek, by skrócić widowisko.",
+			"Aż rynsztok pozwał cię za bezczelne podszywanie się pod markę.",
+			"A karton spod śmietnika dostał nagłego poczucia przewagi.",
+			"Bo kalendarz wyrwał tę kartkę i spalił ją bez ceremonii.",
+			"Więc lustro rozbiło się, żeby nigdy tego nie odbijać.",
+			"Jakby krzesło wolało piec niż dalszy udział w tym cyrku.",
+			"A winda przecięła kabel, bo piwnica była zbyt wysoko.",
+			"Choć żarówka eksplodowała z pieprzonej odmowy uczestnictwa.",
+			"Aż radio nadało sygnał alarmowy i przeszło na emeryturę.",
+			"A śmietnik zatrzasnął klapę przed takim odpadem.",
+			"Bo mucha zdechła w locie, żeby nie zostać sekundę dłużej.",
+			"Więc dywan próbował wpełznąć pod własny spód.",
+			"A cisza zwymiotowała, chociaż nie ma żołądka.",
+			"Choć zegar odmówił działania, żeby nie było świadków.",
+			"Aż gaśnica uznała tę żenadę za niegodną piany.",
+			"A sufit pękł ze śmiechu i szybko przeszedł w żałobę.",
+			"Bo podłoga otworzyła szczelinę, lecz piekło odmówiło odbioru.",
+			"Więc drzwi awaryjne wystrzeliły z zawiasów razem z klamką.",
 		},
 	},
 }
@@ -209,7 +212,7 @@ func generate() ([]reply, error) {
 		for openingIndex, opening := range set.openings {
 			for punchlineIndex, punchline := range set.punchlines {
 				sequence++
-				text := opening + " " + punchline
+				text := composeReply(opening, punchline)
 				entry := reply{
 					ID:               fmt.Sprintf("%s-%03d", set.name, sequence),
 					Locale:           "pl",
@@ -244,7 +247,7 @@ func generate() ([]reply, error) {
 						Tier:             tier,
 						OpeningVariant:   openingIndex + 1,
 						PunchlineVariant: punchlineIndex + 1,
-						Text:             opening + " " + punchline,
+						Text:             composeReply(opening, punchline),
 					}
 					if err := appendUnique(&result, seenIDs, seenTexts, entry); err != nil {
 						return nil, err
@@ -267,6 +270,37 @@ func generate() ([]reply, error) {
 		}
 	}
 	return result, nil
+}
+
+func composeReply(opening string, punchline string) string {
+	opening = trimSentenceEnd(opening)
+	punchline = trimFinisherLink(lowerInitial(trimSentenceEnd(punchline)))
+	return opening + " - " + punchline
+}
+
+func trimSentenceEnd(text string) string {
+	return strings.TrimRight(strings.TrimSpace(text), ".!?…")
+}
+
+func lowerInitial(text string) string {
+	first, firstSize := utf8.DecodeRuneInString(text)
+	if firstSize == 0 {
+		return text
+	}
+	second, _ := utf8.DecodeRuneInString(text[firstSize:])
+	if !unicode.IsUpper(first) || unicode.IsUpper(second) {
+		return text
+	}
+	return string(unicode.ToLower(first)) + text[firstSize:]
+}
+
+func trimFinisherLink(text string) string {
+	for _, link := range []string{"a ", "aż ", "bo ", "choć ", "więc "} {
+		if strings.HasPrefix(text, link) {
+			return strings.TrimPrefix(text, link)
+		}
+	}
+	return text
 }
 
 func appendUnique(result *[]reply, seenIDs, seenTexts map[string]struct{}, entry reply) error {

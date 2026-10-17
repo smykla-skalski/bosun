@@ -78,9 +78,9 @@ Jev returns one typed choice, all option probabilities, and a confidence value. 
 
 Bosun reserves each candidate batch. It adds only the committed reply to the recent reply history.
 
-Each candidate batch has eight distinct setup variants and eight distinct punchline variants.
+Each candidate batch has eight distinct lead variants and eight distinct finisher variants.
 
-Each reply uses two sentence roles. The first sentence answers the message type, and the second adds a related comic scene.
+Each reply is one dash-linked sentence without final punctuation. The lead answers the message type, and the finisher adds a related reversal.
 
 The OpenRouter request requires Zero Data Retention, denies data collection, and requires Decisions API parameters. It also disables the response cache.
 

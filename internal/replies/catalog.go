@@ -187,6 +187,12 @@ func validateReply(reply Reply) error {
 	if err := ValidateModelCandidate(reply.Text); err != nil {
 		return err
 	}
+	if strings.TrimSpace(reply.Text) != reply.Text {
+		return errors.New("text has outer whitespace")
+	}
+	if strings.ContainsAny(reply.Text, ".!?…") {
+		return errors.New("text must be one sentence without terminal punctuation")
+	}
 	return nil
 }
 
