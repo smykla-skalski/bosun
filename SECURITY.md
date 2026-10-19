@@ -16,6 +16,7 @@ If you discover a security vulnerability, please report it by emailing the maint
 
 ### Contact Information
 
+- **Email**: [bartek@smykla.com](mailto:bartek@smykla.com)
 - **GitHub Security Advisories**: Use the "Security" tab in the relevant repository
 
 ### What to Include
