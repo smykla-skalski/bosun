@@ -36,7 +36,7 @@ This Code of Conduct applies within all community spaces, and also applies when 
 
 ## Enforcement
 
-Report abusive, harassing, or other unacceptable behavior through a private GitHub Security Advisory.
+Instances of abusive, harassing, or otherwise unacceptable behavior may be reported to the community leaders responsible for enforcement at [bartek@smykla.com](mailto:bartek@smykla.com).
 
 All complaints will be reviewed and investigated promptly and fairly.
 
