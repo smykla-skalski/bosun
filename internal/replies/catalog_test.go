@@ -174,7 +174,7 @@ func TestValidateModelCandidate(t *testing.T) {
 		"Bosun odpowiada.",
 		"Nazwa Bosunem też odpada.",
 		"Discord odpowiada.",
-		"Configured-server odpowiada.",
+		"Guild odpowiada.",
 		"OpenRouter odpowiada.",
 	}
 	for _, text := range unsafe {

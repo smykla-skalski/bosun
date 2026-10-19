@@ -16,7 +16,6 @@ If you discover a security vulnerability, please report it by emailing the maint
 
 ### Contact Information
 
-- **Email**: [smykla-skalski@users.noreply.github.com](mailto:smykla-skalski@users.noreply.github.com)
 - **GitHub Security Advisories**: Use the "Security" tab in the relevant repository
 
 ### What to Include

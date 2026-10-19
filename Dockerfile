@@ -25,7 +25,7 @@ RUN --mount=type=cache,target=/go/pkg/mod,sharing=locked \
 FROM scratch
 
 LABEL org.opencontainers.image.title="Bosun" \
-      org.opencontainers.image.description="Private Discord bot for the configured-server server" \
+      org.opencontainers.image.description="Private Discord bot for one configured server" \
       org.opencontainers.image.source="https://github.com/smykla-skalski/bosun"
 
 COPY --from=build /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/ca-certificates.crt

@@ -1,4 +1,4 @@
-# Deploy Bosun to configured-server
+# Deploy Bosun
 
 Use this procedure to create one private Discord application and one private Fly Machine.
 
@@ -6,7 +6,7 @@ Version 0.3 supports static and dynamic replies. Static replies remain the guara
 
 ## Prerequisites
 
-- Use a Discord account that can add applications to `configured-server`.
+- Use a Discord account that can add applications to the target server.
 - Use a Fly.io account that can create applications and secrets.
 - Install the tools with `mise install`.
 - Keep all tokens outside the repository.
@@ -22,7 +22,7 @@ Version 0.3 supports static and dynamic replies. Static replies remain the guara
 7. Copy the bot token to a secure temporary location.
 8. Copy the application ID from the `General Information` page.
 9. Enable Discord Developer Mode in your Discord client.
-10. Copy the `configured-server` server ID.
+10. Copy the target server ID.
 
 Do not commit the token or place it in `fly.toml`.
 
@@ -44,15 +44,15 @@ Select these bot permissions:
 
 These four permissions use the integer `274877975552`.
 
-Build this install URL with the application ID and the `configured-server` server ID:
+Build this install URL with the application ID and the target server ID:
 
 ```text
 https://discord.com/oauth2/authorize?client_id=<DISCORD_APPLICATION_ID>&integration_type=0&scope=bot%20applications.commands&permissions=274877975552&guild_id=<DISCORD_GUILD_ID>&disable_guild_select=true
 ```
 
-## Install Bosun in configured-server
+## Install Bosun
 
-Open the completed URL. Approve the private install for `configured-server` before the first Fly deploy.
+Open the completed URL. Approve the private install for the target server before the first Fly deploy.
 
 Bosun registers its guild command when it starts. Discord must authorize Bosun in the guild before that request.
 
@@ -67,7 +67,7 @@ fly auth login
 Use the default Fly application name:
 
 ```sh
-export FLY_APP_NAME="bosun-discord-bot"
+export FLY_APP_NAME="<fly-app-name>"
 fly apps create "$FLY_APP_NAME"
 ```
 
@@ -75,7 +75,7 @@ Use the Discord application ID suffix if the default name already exists:
 
 ```sh
 export DISCORD_APPLICATION_ID="<application-id>"
-export FLY_APP_NAME="bosun-discord-bot-${DISCORD_APPLICATION_ID}"
+export FLY_APP_NAME="<fly-app-name>-${DISCORD_APPLICATION_ID}"
 fly apps create "$FLY_APP_NAME"
 ```
 
@@ -144,7 +144,7 @@ fly secrets import --app "$FLY_APP_NAME"
 ```text
 DISCORD_TOKEN=<bot-token>
 DISCORD_APPLICATION_ID=<application-id>
-DISCORD_GUILD_ID=<configured-server-server-id>
+DISCORD_GUILD_ID=<server-id>
 ```
 
 Run this command to enable dynamic mode:
@@ -187,7 +187,7 @@ The deploy command blocks new public IP addresses and keeps one Machine in `fra`
 
 ## Enable automatic deployment
 
-Create one app-scoped Fly deploy token for the `bosun-discord-bot` application.
+Create one app-scoped Fly deploy token for the application in `FLY_APP_NAME`.
 
 Store that token as the `FLY_API_TOKEN` repository secret.
 
@@ -207,7 +207,7 @@ fly checks list --app "$FLY_APP_NAME"
 fly logs --app "$FLY_APP_NAME"
 ```
 
-Test these actions in a `configured-server` text channel:
+Test these actions in a target server text channel:
 
 - Mention `@Bosun`.
 - Reply to a Bosun message.

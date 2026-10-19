@@ -43,7 +43,7 @@ func TestResolveReplyUsesAnonymousMessageProfile(t *testing.T) {
 	}
 	t.Cleanup(func() { _ = selector.CancelBatch(batch) })
 	selections := batch.Selections
-	canary := "Jan Kowalski <@99> https://private.example/secret DiScOrD.Gg/private-invite DiScOrD.CoM/InViTe/private-invite private-plan.pdf Discord Bosun configured-server, zrób to?!"
+	canary := "Jan Kowalski <@99> https://private.example/secret DiScOrD.Gg/private-invite DiScOrD.CoM/InViTe/private-invite private-plan.pdf Discord Bosun guildname, zrób to?!"
 	result := service.resolveReply(context.Background(), canary, TriggerMention, replies.Category("request"), selections)
 	if result.text != selections[3].Reply.Text || result.source != replySourceOpenRouter || result.faultClass != noFault {
 		t.Fatalf("resolveReply() result = %#v", result)
@@ -67,7 +67,7 @@ func TestResolveReplyUsesAnonymousMessageProfile(t *testing.T) {
 		t.Fatalf("json.Marshal() error = %v", err)
 	}
 	lower := strings.ToLower(string(encoded))
-	for _, forbidden := range []string{"jan", "kowalski", "99", "private-user-id", "private.example", "private-plan.pdf", "discord", "bosun", "configured-server"} {
+	for _, forbidden := range []string{"jan", "kowalski", "99", "private-user-id", "private.example", "private-plan.pdf", "discord", "bosun", "guildname"} {
 		if strings.Contains(lower, forbidden) {
 			t.Fatalf("model profile contains canary %q", forbidden)
 		}

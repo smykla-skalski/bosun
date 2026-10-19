@@ -18,7 +18,7 @@ import (
 func TestCompleteSendsDecisionContractAndReturnsChoice(t *testing.T) {
 	t.Parallel()
 
-	canary := "Jan Kowalski @captain 123456789 https://private.example/secret DiScOrD.Gg/private-invite DiScOrD.CoM/InViTe/private-invite report.pdf Discord Bosun configured-server"
+	canary := "Jan Kowalski @captain 123456789 https://private.example/secret DiScOrD.Gg/private-invite DiScOrD.CoM/InViTe/private-invite report.pdf Discord Bosun guildname"
 	profile, err := messageprofile.Build(canary, "Bosun", "ask", "request", "harsh")
 	if err != nil {
 		t.Fatalf("Build() error = %v", err)
@@ -144,7 +144,7 @@ func assertDecisionQuestion(t *testing.T, raw json.RawMessage, candidateType str
 func assertNoCanaries(t *testing.T, location string, value string) {
 	t.Helper()
 	lower := strings.ToLower(value)
-	for _, forbidden := range []string{"jan", "kowalski", "captain", "123456789", "private.example", "report.pdf", "discord.gg", "discord.com/invite", "discord", "bosun", "configured-server"} {
+	for _, forbidden := range []string{"jan", "kowalski", "captain", "123456789", "private.example", "report.pdf", "discord.gg", "discord.com/invite", "discord", "bosun", "guildname"} {
 		if strings.Contains(lower, forbidden) {
 			t.Errorf("request %s contains canary %q", location, forbidden)
 		}
@@ -167,7 +167,7 @@ func TestDecisionInstructionsKeepSafetyAndDataBoundaries(t *testing.T) {
 			t.Fatalf("decision instructions do not contain rule %q", rule)
 		}
 	}
-	for _, forbidden := range []string{"discord", "bosun", "configured-server"} {
+	for _, forbidden := range []string{"discord", "bosun", "guildname"} {
 		if strings.Contains(strings.ToLower(decisionInstructions), forbidden) {
 			t.Fatalf("decision instructions contain forbidden term %q", forbidden)
 		}
@@ -177,7 +177,7 @@ func TestDecisionInstructionsKeepSafetyAndDataBoundaries(t *testing.T) {
 func TestNewRejectsEveryModelOutsideAllowlist(t *testing.T) {
 	t.Parallel()
 
-	for _, model := range []string{"", "example/model", "private-person/private-model", "example/discord-model", "configured-server/model"} {
+	for _, model := range []string{"", "example/model", "private-person/private-model", "example/discord-model", "private-community/model"} {
 		_, err := New(Config{
 			APIKey: "test-key", Model: model, BalanceCooldown: 15 * time.Minute, RequestTimeout: 5 * time.Second,
 		})

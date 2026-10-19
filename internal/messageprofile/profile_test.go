@@ -79,7 +79,7 @@ func TestProfileRejectsInconsistentConversationContext(t *testing.T) {
 func TestProfileJSONHasExactKeysAndNoCanaryData(t *testing.T) {
 	t.Parallel()
 
-	canary := "Jan Kowalski @captain 123456789 https://private.example/secret DiScOrD.Gg/private-invite DiScOrD.CoM/InViTe/private-invite report.pdf Discord Bosun configured-server"
+	canary := "Jan Kowalski @captain 123456789 https://private.example/secret DiScOrD.Gg/private-invite DiScOrD.CoM/InViTe/private-invite report.pdf Discord Bosun guildname"
 	profile, err := Build(canary, "Bosun", "ask", "request", "harsh")
 	if err != nil {
 		t.Fatalf("Build() error = %v", err)
@@ -105,7 +105,7 @@ func TestProfileJSONHasExactKeysAndNoCanaryData(t *testing.T) {
 		}
 	}
 	lower := strings.ToLower(string(encoded))
-	for _, forbidden := range []string{"jan", "kowalski", "captain", "123456789", "private.example", "report.pdf", "discord", "bosun", "configured-server"} {
+	for _, forbidden := range []string{"jan", "kowalski", "captain", "123456789", "private.example", "report.pdf", "discord", "bosun", "guildname"} {
 		if strings.Contains(lower, forbidden) {
 			t.Errorf("profile contains canary %q", forbidden)
 		}
@@ -331,7 +331,7 @@ func TestProfileValidateRejectsEachUnknownLabel(t *testing.T) {
 }
 
 func FuzzBuildUsesOnlyFixedLabels(f *testing.F) {
-	for _, value := range []string{"", "cześć", "CO?!", "😂", "1. a\n2. b", "Discord Bosun configured-server"} {
+	for _, value := range []string{"", "cześć", "CO?!", "😂", "1. a\n2. b", "Discord Bosun guildname"} {
 		f.Add(value)
 	}
 	f.Fuzz(func(t *testing.T, text string) {

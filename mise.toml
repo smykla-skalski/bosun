@@ -58,19 +58,21 @@ run = "actionlint .github/workflows/*.yaml"
 
 [tasks."docker:build"]
 description = "Build the container image"
-run = "docker build --pull --platform linux/amd64 --tag bosun-discord-bot:local ."
+run = "docker build --pull --platform linux/amd64 --tag bosun:local ."
 
 [tasks."fly:validate"]
 description = "Validate the Fly configuration"
 run = '''
-fly_app_name="${FLY_APP_NAME:-bosun-discord-bot}"
+: "${FLY_APP_NAME:?set FLY_APP_NAME}"
+fly_app_name="$FLY_APP_NAME"
 fly config validate --app "$fly_app_name" --config fly.toml --strict
 '''
 
 [tasks."fly:deploy"]
 description = "Deploy Bosun to Fly"
 run = '''
-fly_app_name="${FLY_APP_NAME:-bosun-discord-bot}"
+: "${FLY_APP_NAME:?set FLY_APP_NAME}"
+fly_app_name="$FLY_APP_NAME"
 fly deploy --app "$fly_app_name" --config fly.toml --ha=false --no-public-ips
 fly scale count 1 --app "$fly_app_name" --config fly.toml --region fra --yes
 '''

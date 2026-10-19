@@ -46,7 +46,7 @@ var (
 	modelMentionPattern   = regexp.MustCompile(`(?i)(?:<@!?[0-9]+>|<@&[0-9]+>|<#[0-9]+>|@everyone\b|@here\b)`)
 	modelEmailPattern     = regexp.MustCompile(`(?i)\b[a-z0-9._%+\-]+@[a-z0-9.\-]+\.[a-z]{2,}\b`)
 	modelLongDigitPattern = regexp.MustCompile(`[0-9]{7,}`)
-	modelServicePattern   = regexp.MustCompile(`(?i)(?:bosun|discord|configured-server|openrouter)`)
+	modelServicePattern   = regexp.MustCompile(`(?i)(?:bosun|discord|guild|openrouter)`)
 )
 
 var ErrUnsafeModelCandidate = errors.New("unsafe model candidate")

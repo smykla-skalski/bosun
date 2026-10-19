@@ -1,6 +1,6 @@
 # Bosun
 
-Bosun is a private Discord bot for the `configured-server` server.
+Bosun is a private Discord bot for one configured server.
 
 Version 0.3 first classifies each message inside the process. It then selects one of 6,400 Polish static replies by category.
 
@@ -53,7 +53,7 @@ Set these required variables in the process environment:
 ```text
 DISCORD_TOKEN=<bot-token>
 DISCORD_APPLICATION_ID=<application-id>
-DISCORD_GUILD_ID=<configured-server-server-id>
+DISCORD_GUILD_ID=<server-id>
 ```
 
 Use these optional variables when the defaults do not apply:
@@ -109,7 +109,7 @@ The `/readyz` endpoint returns success after the Discord gateway becomes ready.
 
 Use [docs/deployment.md](docs/deployment.md) to create, deploy, install, and test Bosun.
 
-The Fly tasks use `bosun-discord-bot` unless `FLY_APP_NAME` selects the documented fallback name.
+The Fly tasks require `FLY_APP_NAME`.
 
 A push to `main` runs every local check and deploys one healthy Fly Machine through GitHub Actions.
 
@@ -154,6 +154,6 @@ List all tasks with `mise tasks ls`.
 | `mise run check` | Run the format, catalog, lint, test, race, and build checks. |
 | `mise run replies:generate` | Create the 6,400 reply catalog. |
 | `mise run workflow:check` | Check the GitHub Actions workflow. |
-| `mise run docker:build` | Build `bosun-discord-bot:local`. |
+| `mise run docker:build` | Build `bosun:local`. |
 | `mise run fly:validate` | Validate `fly.toml` with strict checks. |
 | `mise run fly:deploy` | Deploy one private Fly Machine in Frankfurt. |
