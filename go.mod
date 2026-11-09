@@ -1,6 +1,6 @@
 module github.com/smykla-skalski/bosun
 
-go 1.27.2
+go 1.27.3
 
 require (
 	github.com/disgoorg/disgo v0.19.6
